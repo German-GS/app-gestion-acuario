@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Reglas existentes para los acuarios (sin cambios)
+    match /aquariums/{aquariumId} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow list: if request.auth != null;
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      match /parameters/{parameterId} {
+        allow read, list: if request.auth != null && resource.data.userId == request.auth.uid;
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      }
+    }
+
+    // --- 👇 AÑADE ESTA NUEVA REGLA AQUÍ 👇 ---
+    // Permite que cualquier usuario autenticado pueda leer los artículos.
+    match /articles/{articleId} {
+      allow read: if request.auth != null;
+    }
+  }
+}

@@ -1,24 +1,57 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+// app/_layout.js
+import { SplashScreen, Stack, useRouter, useSegments } from "expo-router";
+import React, { useEffect } from "react";
+import { useAuth } from "../hooks/useAuth";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
 
+  // --- LÓGICA DE REDIRECCIÓN CORREGIDA ---
+  useEffect(() => {
+    // Si todavía estamos verificando al usuario, no hacemos nada.
+    if (isLoading) return;
+
+    // `inAuthGroup` nos dice si la ruta actual está dentro de la carpeta (auth)
+    const inAuthGroup = segments[0] === "(auth)";
+
+    if (user && inAuthGroup) {
+      // Si el usuario ya está logueado PERO está en la pantalla de login/registro,
+      // lo mandamos al dashboard.
+      router.replace("/(tabs)");
+    } else if (!user) {
+      // Si no hay usuario en absoluto, lo mandamos al login.
+      // Esto protege todas las pantallas de la app.
+      router.replace("/(auth)/login");
+    }
+
+    // Una vez que la lógica termina, podemos ocultar la pantalla de carga.
+    if (!isLoading) {
+      SplashScreen.hideAsync();
+    }
+  }, [user, isLoading]); // <-- IMPORTANTE: Quitamos 'segments' de aquí
+
+  // Si está cargando, no mostramos nada para evitar parpadeos
+  if (isLoading) {
+    return null;
+  }
+
+  // El Stack no cambia
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Stack>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="createAquarium"
+        options={{
+          presentation: "modal",
+          headerTitle: "Nuevo Acuario",
+          headerBackTitle: "Cancelar",
+        }}
+      />
+    </Stack>
   );
 }

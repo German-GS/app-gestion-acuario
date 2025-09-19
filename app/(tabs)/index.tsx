@@ -1,98 +1,387 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+// app/(tabs)/index.tsx
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { Link, useFocusEffect, useRouter } from "expo-router";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  where,
+} from "firebase/firestore";
+import React, { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { PARAMETERS } from "../../components/AddParameterModal";
+import { RANGES } from "../../constants/parameterRanges";
+import { RECOMMENDATIONS } from "../../constants/recommendations";
+import { AppTheme } from "../../constants/theme";
+import { auth, db } from "../../firebaseConfig";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
-
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
-
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
-  );
+// --- (Interfaces y getAquariumStatus sin cambios) ---
+type LatestParameters = { [key in keyof typeof PARAMETERS]?: number };
+interface Aquarium {
+  id: string;
+  name: string;
+  volume: number;
+  mainType: "freshwater" | "marine";
+  subType: string;
+  latestParameters?: LatestParameters;
 }
+const getAquariumStatus = (
+  aquarium: Aquarium
+): { text: string; color: string; recommendations?: string[] } => {
+  const hasLatestParams =
+    aquarium.latestParameters &&
+    Object.keys(aquarium.latestParameters).length > 0;
+  if (!hasLatestParams) {
+    return {
+      text: "Registra un parámetro para ver el estado",
+      color: AppTheme.COLORS.darkGray,
+    };
+  }
+  const ranges = RANGES[aquarium.subType as keyof typeof RANGES];
+  if (!ranges) {
+    return {
+      text: "Rangos no definidos para este tipo de acuario",
+      color: AppTheme.COLORS.accentMarine,
+    };
+  }
+  const alerts: string[] = [];
+  const uniqueRecommendations = new Set<string>();
+  for (const paramKey in aquarium.latestParameters) {
+    const key = paramKey as keyof typeof ranges & keyof typeof RECOMMENDATIONS;
+    const paramConfig = ranges[key];
+    const currentValue =
+      aquarium.latestParameters[key as keyof LatestParameters];
+    if (paramConfig && currentValue !== undefined) {
+      if (currentValue < paramConfig.min) {
+        alerts.push(`${paramConfig.name} bajo`);
+        if (RECOMMENDATIONS[key]?.low)
+          uniqueRecommendations.add(RECOMMENDATIONS[key].low);
+      } else if (currentValue > paramConfig.max) {
+        alerts.push(`${paramConfig.name} alto`);
+        if (RECOMMENDATIONS[key]?.high)
+          uniqueRecommendations.add(RECOMMENDATIONS[key].high);
+      }
+    }
+  }
+  if (alerts.length === 0) {
+    return {
+      text: "Parámetros estables",
+      color: AppTheme.COLORS.accentFreshwater,
+    };
+  }
+  return {
+    text: `Alerta: ${alerts.join(", ")}`,
+    color: AppTheme.COLORS.accentMarine,
+    recommendations: Array.from(uniqueRecommendations),
+  };
+};
 
+const HomeScreen = () => {
+  const router = useRouter();
+  const [aquariums, setAquariums] = useState<Aquarium[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const handleDelete = (aquariumId: string, aquariumName: string) => {
+    Alert.alert(
+      "Confirmar Borrado",
+      `¿Estás seguro de que quieres eliminar "${aquariumName}"?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          onPress: async () => {
+            try {
+              await deleteDoc(doc(db, "aquariums", aquariumId));
+              setAquariums((prev) => prev.filter((aq) => aq.id !== aquariumId));
+            } catch (error) {
+              console.error("Error al eliminar el acuario:", error);
+              Alert.alert("Error", "No se pudo eliminar el acuario.");
+            }
+          },
+          style: "destructive",
+        },
+      ]
+    );
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchAquariums = async () => {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          setIsLoading(false);
+          return;
+        }
+        try {
+          const q = query(
+            collection(db, "aquariums"),
+            where("userId", "==", currentUser.uid)
+          );
+          const snapshot = await getDocs(q);
+          const userAquariumsData = snapshot.docs.map(
+            (doc) => ({ id: doc.id, ...doc.data() } as Aquarium)
+          );
+          const aquariumsWithParams = await Promise.all(
+            userAquariumsData.map(async (aquarium) => {
+              const latestParameters: LatestParameters = {};
+              // --- 👇 MODIFICADO: AHORA BUSCAMOS TODOS LOS PARÁMETROS IMPORTANTES 👇 ---
+              const paramsToFetch = ["kh", "ca", "no3", "po4", "mg"];
+              for (const paramKey of paramsToFetch) {
+                const paramsRef = collection(
+                  db,
+                  "aquariums",
+                  aquarium.id,
+                  "parameters"
+                );
+                const paramQuery = query(
+                  paramsRef,
+                  where("type", "==", paramKey),
+                  where("userId", "==", currentUser.uid),
+                  orderBy("timestamp", "desc"),
+                  limit(1)
+                );
+                const paramSnapshot = await getDocs(paramQuery);
+                if (!paramSnapshot.empty) {
+                  latestParameters[paramKey as keyof LatestParameters] =
+                    paramSnapshot.docs[0].data().value;
+                }
+              }
+              return { ...aquarium, latestParameters };
+            })
+          );
+          setAquariums(aquariumsWithParams);
+        } catch (error) {
+          console.error("Error al cargar acuarios:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchAquariums();
+    }, [])
+  );
+
+  const AquariumCard = ({ item }: { item: Aquarium }) => {
+    const isMarine = item.mainType === "marine";
+    const status = getAquariumStatus(item);
+    const params = item.latestParameters || {};
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Link href={`/aquarium/${item.id}`} asChild>
+            <TouchableOpacity style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>
+                {item.name} ({item.volume}L)
+              </Text>
+            </TouchableOpacity>
+          </Link>
+          <TouchableOpacity
+            onPress={() => handleDelete(item.id, item.name)}
+            style={styles.deleteButton}
+          >
+            <FontAwesome
+              name="trash-o"
+              size={22}
+              color={AppTheme.COLORS.darkGray}
+            />
+          </TouchableOpacity>
+        </View>
+        <Link href={`/aquarium/${item.id}`} asChild>
+          <TouchableOpacity>
+            {/* --- 👇 MODIFICADO: AÑADIMOS PO4 A LA VISTA DE LA TARJETA 👇 --- */}
+            <View style={styles.cardBody}>
+              <View style={styles.parameter}>
+                <Text style={styles.parameterLabel}>KH:</Text>
+                <Text style={styles.parameterText}>{params.kh ?? "--"}</Text>
+              </View>
+              <View style={styles.parameter}>
+                <Text style={styles.parameterLabel}>Ca:</Text>
+                <Text style={styles.parameterText}>{params.ca ?? "--"}</Text>
+              </View>
+              <View style={styles.parameter}>
+                <Text style={styles.parameterLabel}>Mg:</Text>
+                <Text style={styles.parameterText}>{params.mg ?? "--"}</Text>
+              </View>
+              <View style={styles.parameter}>
+                <Text style={styles.parameterLabel}>NO₃:</Text>
+                <Text style={styles.parameterText}>{params.no3 ?? "--"}</Text>
+              </View>
+              <View style={styles.parameter}>
+                <Text style={styles.parameterLabel}>PO₄:</Text>
+                <Text style={styles.parameterText}>{params.po4 ?? "--"}</Text>
+              </View>
+            </View>
+            <View style={styles.cardFooter}>
+              <View
+                style={[
+                  styles.alertIndicator,
+                  { backgroundColor: status.color },
+                ]}
+              />
+              <Text style={styles.alertText}>{status.text}</Text>
+            </View>
+            {status.recommendations &&
+              status.recommendations.map((rec, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.recommendationContainer,
+                    index > 0 && { marginTop: 5 },
+                  ]}
+                >
+                  <FontAwesome
+                    name="lightbulb-o"
+                    size={16}
+                    color={AppTheme.COLORS.darkGray}
+                  />
+                  <Text style={styles.recommendationText}>{rec}</Text>
+                </View>
+              ))}
+          </TouchableOpacity>
+        </Link>
+      </View>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.centerContent}>
+        <ActivityIndicator size="large" color={AppTheme.COLORS.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {aquariums.length === 0 ? (
+        <View style={styles.centerContent}>
+          <Text style={styles.subtitle}>
+            Crea tu primer acuario para empezar a registrar.
+          </Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.list}>
+          {aquariums.map((item) => (
+            <AquariumCard key={item.id} item={item} />
+          ))}
+        </ScrollView>
+      )}
+      <TouchableOpacity
+        style={styles.floatingButton}
+        onPress={() => router.push("/createAquarium")}
+      >
+        <FontAwesome name="plus" size={24} color="white" />
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+// --- (Estilos sin cambios) ---
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: { flex: 1, backgroundColor: AppTheme.COLORS.background },
+  centerContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: AppTheme.SIZES.padding,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  subtitle: { ...AppTheme.FONTS.body1, textAlign: "center" },
+  list: { padding: AppTheme.SIZES.padding },
+  card: {
+    backgroundColor: AppTheme.COLORS.white,
+    borderRadius: AppTheme.SIZES.radius * 1.5,
+    padding: AppTheme.SIZES.margin,
+    marginBottom: AppTheme.SIZES.margin,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: AppTheme.SIZES.margin,
+  },
+  cardTitle: { ...AppTheme.FONTS.h3, flex: 1 },
+  deleteButton: { padding: 8 },
+  tag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: AppTheme.SIZES.radius,
+  },
+  tagMarine: { backgroundColor: "#FFE0EE" },
+  tagFreshwater: { backgroundColor: "#E0FFF0" },
+  tagText: { ...AppTheme.FONTS.caption, fontWeight: "bold" },
+  cardBody: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: AppTheme.SIZES.margin,
+    flexWrap: "wrap",
+  }, // Añadido flexWrap
+  parameter: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 5,
+    marginBottom: 5,
+  }, // Añadido margen
+  parameterText: { ...AppTheme.FONTS.body2, marginLeft: 6 },
+  parameterLabel: { ...AppTheme.FONTS.body2, fontWeight: "bold" },
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: AppTheme.SIZES.base,
+    borderTopWidth: 1,
+    borderTopColor: AppTheme.COLORS.lightGray,
+  },
+  alertIndicator: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
+  alertText: {
+    ...AppTheme.FONTS.caption,
+    flex: 1,
+    color: AppTheme.COLORS.darkGray,
+  },
+  floatingButton: {
+    position: "absolute",
+    bottom: 30,
+    right: 30,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: AppTheme.COLORS.secondary,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 8,
+  },
+  recommendationContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: "#fffbe6",
+    borderRadius: AppTheme.SIZES.radius,
+    borderWidth: 1,
+    borderColor: "#ffe58f",
+  },
+  recommendationText: {
+    ...AppTheme.FONTS.caption,
+    flex: 1,
+    marginLeft: 8,
+    color: "#614700",
+    lineHeight: 18,
   },
 });
+
+export default HomeScreen;

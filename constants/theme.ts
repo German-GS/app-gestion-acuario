@@ -1,53 +1,54 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
+// constants/theme.js
 
-import { Platform } from 'react-native';
+// Definimos la paleta de colores que diseñamos.
+// Usar nombres descriptivos nos ayuda a recordar su propósito.
+export const COLORS = {
+  primary: '#0A2A4E',        // Azul Profundo
+  secondary: '#00C2D1',      // Turquesa Vibrante
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+  background: '#F8F9FA',      // Blanco Nube
+  text: '#495057',            // Gris Neutro
+  white: '#FFFFFF',
 
-export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
-  },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-  },
+  // Colores de Acento
+  accentFreshwater: '#57A867',
+  accentMarine: '#FF6B6B',
+
+  // Tonos de gris
+  lightGray: '#E0E0E0',
+  darkGray: '#8A8A8A',
 };
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
+// Definimos una escala consistente para tamaños y espaciados.
+// Usar múltiplos de un valor base (ej. 8) crea un ritmo visual agradable.
+export const SIZES = {
+  base: 8,
+  font: 14,
+  radius: 12,
+  padding: 24,
+  margin: 16,
+
+  // Tamaños de fuente
+  h1: 30,
+  h2: 22,
+  h3: 18,
+  body1: 16,
+  body2: 14,
+  caption: 12,
+};
+
+// Definimos los estilos de nuestras fuentes.
+// Aquí combinamos la familia de fuente, el tamaño y el color por defecto.
+export const FONTS = {
+  h1: { fontFamily: 'Montserrat_700Bold', fontSize: SIZES.h1, lineHeight: 36, color: COLORS.primary },
+  h2: { fontFamily: 'Montserrat_600SemiBold', fontSize: SIZES.h2, lineHeight: 30, color: COLORS.primary },
+  h3: { fontFamily: 'Montserrat_600SemiBold', fontSize: SIZES.h3, lineHeight: 22, color: COLORS.primary },
+  body1: { fontFamily: 'Lato_400Regular', fontSize: SIZES.body1, lineHeight: 24, color: COLORS.text },
+  body2: { fontFamily: 'Lato_400Regular', fontSize: SIZES.body2, lineHeight: 22, color: COLORS.text },
+  caption: { fontFamily: 'Lato_400Regular', fontSize: SIZES.caption, lineHeight: 18, color: COLORS.darkGray },
+};
+
+// Exportamos todo en un solo objeto 'AppTheme' para fácil importación.
+export const AppTheme = { COLORS, SIZES, FONTS };
+
+export default AppTheme;
