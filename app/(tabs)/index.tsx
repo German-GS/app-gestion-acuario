@@ -1,17 +1,8 @@
 // app/(tabs)/index.tsx
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { Link, useFocusEffect, useRouter } from "expo-router";
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  where,
-} from "firebase/firestore";
-import React, { useCallback, useState } from "react";
+import { deleteDoc, doc } from "firebase/firestore";
+import React, { useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -21,34 +12,35 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { PARAMETERS } from "../../components/AddParameterModal";
 import { RANGES } from "../../constants/parameterRanges";
 import { RECOMMENDATIONS } from "../../constants/recommendations";
 import { AppTheme } from "../../constants/theme";
-import { auth, db } from "../../firebaseConfig";
+import { db } from "../../firebaseConfig";
+import { useAquariumStore } from "../../store/aquariumStore"; // <-- 1. Importa el store
 
 // --- (Interfaces y getAquariumStatus sin cambios) ---
-type LatestParameters = { [key in keyof typeof PARAMETERS]?: number };
+// ... (puedes mantener las interfaces y la función getAquariumStatus exactamente como estaban)
 interface Aquarium {
   id: string;
   name: string;
   volume: number;
   mainType: "freshwater" | "marine";
   subType: string;
-  latestParameters?: LatestParameters;
+  latestParameters?: { [key: string]: number };
 }
 const getAquariumStatus = (
   aquarium: Aquarium
 ): { text: string; color: string; recommendations?: string[] } => {
-  const hasLatestParams =
-    aquarium.latestParameters &&
-    Object.keys(aquarium.latestParameters).length > 0;
-  if (!hasLatestParams) {
+  const latestParams = aquarium.latestParameters; // Guardamos en una variable para simpleza
+
+  // Si no hay parámetros, retornamos el estado inicial
+  if (!latestParams || Object.keys(latestParams).length === 0) {
     return {
       text: "Registra un parámetro para ver el estado",
       color: AppTheme.COLORS.darkGray,
     };
   }
+
   const ranges = RANGES[aquarium.subType as keyof typeof RANGES];
   if (!ranges) {
     return {
@@ -56,13 +48,17 @@ const getAquariumStatus = (
       color: AppTheme.COLORS.accentMarine,
     };
   }
+
   const alerts: string[] = [];
   const uniqueRecommendations = new Set<string>();
-  for (const paramKey in aquarium.latestParameters) {
+
+  // --- 👇 ESTE ES EL BUCLE CORREGIDO 👇 ---
+  // Usamos Object.keys() para asegurar que 'paramKey' sea siempre un string
+  for (const paramKey of Object.keys(latestParams)) {
     const key = paramKey as keyof typeof ranges & keyof typeof RECOMMENDATIONS;
     const paramConfig = ranges[key];
-    const currentValue =
-      aquarium.latestParameters[key as keyof LatestParameters];
+    const currentValue = latestParams[key]; // Ahora podemos acceder de forma segura
+
     if (paramConfig && currentValue !== undefined) {
       if (currentValue < paramConfig.min) {
         alerts.push(`${paramConfig.name} bajo`);
@@ -75,12 +71,14 @@ const getAquariumStatus = (
       }
     }
   }
+
   if (alerts.length === 0) {
     return {
       text: "Parámetros estables",
       color: AppTheme.COLORS.accentFreshwater,
     };
   }
+
   return {
     text: `Alerta: ${alerts.join(", ")}`,
     color: AppTheme.COLORS.accentMarine,
@@ -90,8 +88,9 @@ const getAquariumStatus = (
 
 const HomeScreen = () => {
   const router = useRouter();
-  const [aquariums, setAquariums] = useState<Aquarium[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // --- 2. Usa el estado y las acciones del store ---
+  const { aquariums, isLoading, fetchAquariums, removeAquarium } =
+    useAquariumStore();
 
   const handleDelete = (aquariumId: string, aquariumName: string) => {
     Alert.alert(
@@ -104,7 +103,7 @@ const HomeScreen = () => {
           onPress: async () => {
             try {
               await deleteDoc(doc(db, "aquariums", aquariumId));
-              setAquariums((prev) => prev.filter((aq) => aq.id !== aquariumId));
+              removeAquarium(aquariumId); // <-- 3. Llama a la acción del store
             } catch (error) {
               console.error("Error al eliminar el acuario:", error);
               Alert.alert("Error", "No se pudo eliminar el acuario.");
@@ -116,64 +115,16 @@ const HomeScreen = () => {
     );
   };
 
+  // --- 4. El `useFocusEffect` ahora solo llama a la acción de fetch ---
   useFocusEffect(
     useCallback(() => {
-      const fetchAquariums = async () => {
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-          setIsLoading(false);
-          return;
-        }
-        try {
-          const q = query(
-            collection(db, "aquariums"),
-            where("userId", "==", currentUser.uid)
-          );
-          const snapshot = await getDocs(q);
-          const userAquariumsData = snapshot.docs.map(
-            (doc) => ({ id: doc.id, ...doc.data() } as Aquarium)
-          );
-          const aquariumsWithParams = await Promise.all(
-            userAquariumsData.map(async (aquarium) => {
-              const latestParameters: LatestParameters = {};
-              // --- 👇 MODIFICADO: AHORA BUSCAMOS TODOS LOS PARÁMETROS IMPORTANTES 👇 ---
-              const paramsToFetch = ["kh", "ca", "no3", "po4", "mg"];
-              for (const paramKey of paramsToFetch) {
-                const paramsRef = collection(
-                  db,
-                  "aquariums",
-                  aquarium.id,
-                  "parameters"
-                );
-                const paramQuery = query(
-                  paramsRef,
-                  where("type", "==", paramKey),
-                  where("userId", "==", currentUser.uid),
-                  orderBy("timestamp", "desc"),
-                  limit(1)
-                );
-                const paramSnapshot = await getDocs(paramQuery);
-                if (!paramSnapshot.empty) {
-                  latestParameters[paramKey as keyof LatestParameters] =
-                    paramSnapshot.docs[0].data().value;
-                }
-              }
-              return { ...aquarium, latestParameters };
-            })
-          );
-          setAquariums(aquariumsWithParams);
-        } catch (error) {
-          console.error("Error al cargar acuarios:", error);
-        } finally {
-          setIsLoading(false);
-        }
-      };
       fetchAquariums();
     }, [])
   );
 
+  // El resto del componente (AquariumCard y el return) no necesita cambios
   const AquariumCard = ({ item }: { item: Aquarium }) => {
-    const isMarine = item.mainType === "marine";
+    // ... (El código de AquariumCard se mantiene igual)
     const status = getAquariumStatus(item);
     const params = item.latestParameters || {};
 
@@ -288,7 +239,7 @@ const HomeScreen = () => {
   );
 };
 
-// --- (Estilos sin cambios) ---
+// ... (Los estilos se mantienen iguales)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: AppTheme.COLORS.background },
   centerContent: {

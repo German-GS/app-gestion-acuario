@@ -1,5 +1,7 @@
 // app/(auth)/login.js
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useRouter } from 'expo-router';
+import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,47 +18,52 @@ import {
   View
 } from 'react-native';
 import { AppTheme } from '../../constants/theme';
-
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
-// --- 👇 IMPORTANTE: AÑADIMOS signInWithEmailAndPassword 👇 ---
-import { GoogleAuthProvider, signInWithCredential, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../firebaseConfig';
-
-WebBrowser.maybeCompleteAuthSession();
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false); // Estado para feedback visual
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  // --- Lógica de Google (sin cambios) ---
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    iosClientId: "91058824770-piv7dgiijuvckiq1e53n9geoasj38b2a.apps.googleusercontent.com",
-    androidClientId: "91058824770-m4i4hbgkfrfe789e47ig20mndgq2qr0r.apps.googleusercontent.com",
-    webClientId: "91058824770-aigfc59143jmeqfdi0rfus5kqngeqq18.apps.googleusercontent.com",
-    scopes: ['openid', 'profile', 'email'],
-  });
-
   useEffect(() => {
-    if (response) {
-      if (response.type === 'success') {
-        const { id_token } = response.params;
-        const credential = GoogleAuthProvider.credential(id_token);
-        signInWithCredential(auth, credential).catch(error => {
-            console.error("Error en signInWithCredential:", error);
-            Alert.alert("Error", "No se pudo validar la credencial de Google.");
-        });
-      } else if (response.type === 'error') {
-        console.error("Error en la respuesta de autenticación:", response.error);
-        Alert.alert("Error", "Ocurrió un error durante la autenticación.");
+    // Configura Google Sign-In una sola vez.
+    // El webClientId se usa para obtener el idToken y es indispensable.
+    GoogleSignin.configure({
+      webClientId: '91058824770-aigfc59143jmeqfdi0rfus5kqngeqq18.apps.googleusercontent.com',
+      // 👇 AÑADE ESTA LÍNEA QUE FALTABA 👇
+      scopes: ['profile', 'email'], 
+    });
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+
+      // --- 👇 LA CORRECCIÓN ESTÁ AQUÍ 👇 ---
+      // Obtenemos el idToken desde userInfo.data en lugar de userInfo
+      const idToken = userInfo.data?.idToken;
+
+      if (!idToken) {
+          throw new Error("No se pudo obtener el idToken de la respuesta de Google.");
+      }
+
+      const googleCredential = GoogleAuthProvider.credential(idToken);
+      await signInWithCredential(auth, googleCredential);
+
+    } catch (error) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        console.log('Inicio de sesión cancelado por el usuario');
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        console.log('El inicio de sesión ya está en progreso');
+      } else {
+        console.error("Error detallado de Google Sign-In:", error);
+        Alert.alert('Error', 'Ocurrió un error durante el inicio de sesión con Google.');
       }
     }
-  }, [response]);
-
-
-  // --- 👇 LÓGICA DE INICIO DE SESIÓN CON CORREO IMPLEMENTADA 👇 ---
+  };
+  
   const handleEmailLogin = () => {
     if (!email || !password) {
       Alert.alert("Campos incompletos", "Por favor, introduce tu correo y contraseña.");
@@ -65,12 +72,7 @@ const LoginScreen = () => {
     setIsLoading(true);
     signInWithEmailAndPassword(auth, email, password)
       .catch(error => {
-        console.log(error.code);
-        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-            Alert.alert("Error", "Las credenciales son incorrectas. Por favor, verifica tu correo y contraseña.");
-        } else {
-            Alert.alert("Error", "Ocurrió un error al intentar iniciar sesión.");
-        }
+        Alert.alert("Error", "Las credenciales son incorrectas.");
       })
       .finally(() => {
         setIsLoading(false);
@@ -116,8 +118,7 @@ const LoginScreen = () => {
 
            <TouchableOpacity
             style={[styles.button, styles.googleButton]}
-            disabled={!request || isLoading}
-            onPress={() => promptAsync()}
+            onPress={handleGoogleLogin}
           >
             <Text style={styles.buttonText}>🚀 Iniciar con Google</Text>
           </TouchableOpacity>

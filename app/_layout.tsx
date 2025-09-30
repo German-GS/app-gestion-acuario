@@ -32,7 +32,7 @@ export default function RootLayout() {
     if (!isLoading) {
       SplashScreen.hideAsync();
     }
-  }, [user, isLoading]); // <-- IMPORTANTE: Quitamos 'segments' de aquí
+  }, [user, isLoading, segments]); // <-- IMPORTANTE: Añadimos 'segments' aquí
 
   // Si está cargando, no mostramos nada para evitar parpadeos
   if (isLoading) {
@@ -49,7 +49,14 @@ export default function RootLayout() {
         options={{
           presentation: "modal",
           headerTitle: "Nuevo Acuario",
-          headerBackTitle: "Cancelar",
+        }}
+      />
+      {/* --- 👇 AÑADE ESTA CONFIGURACIÓN 👇 --- */}
+      <Stack.Screen
+        name="reminders"
+        options={{
+          presentation: "modal",
+          headerShown: false, // La pantalla ya tiene su propia cabecera
         }}
       />
     </Stack>

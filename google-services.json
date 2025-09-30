@@ -14,11 +14,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "91058824770-m4i4hbgkfrfe789e47ig20mndgq2qr0r.apps.googleusercontent.com",
+          "client_id": "91058824770-ji7514ti365ilg1svgqaumcbg5oumjl7.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.aquamind.app",
-            "certificate_hash": "04225d62f4845fce2a3314f1e7c17ff4b34deae0"
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
           }
         },
         {

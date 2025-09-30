@@ -4,30 +4,34 @@
     "slug": "AquaMind",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/icono.png",
     "scheme": "aquamind",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.aquamind.app"
+      "bundleIdentifier": "com.aquamind.app",
+      "jsEngine": "hermes"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "monochromeImage": "./assets/images/android-icon-monochrome.png",
+        "jsEngine": "hermes"
       },
       "package": "com.aquamind.app"
     },
-    "edgeToEdgeEnabled": true,
-    "predictiveBackGestureEnabled": false,
+  
     "extra": {
       "eas": {
         "projectId": "1b186bbe-733f-45c7-b8b3-9bf34933413d"
       }
-    }
+    },
+    "plugins": [
+      "expo-router"
+    ]
   },
   "web": {
     "output": "static",
@@ -47,7 +51,8 @@
         }
       }
     ],
-    "expo-font"
+    "expo-font",
+    "react-native-reanimated/plugin"
   ],
   "experiments": {
     "typedRoutes": true,

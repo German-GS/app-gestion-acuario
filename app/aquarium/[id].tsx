@@ -1,12 +1,12 @@
-// app/aquarium/[id].tsx
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import * as ImagePicker from "expo-image-picker";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import {
   addDoc,
   collection,
   doc,
   onSnapshot,
+  orderBy,
   query,
   serverTimestamp,
   updateDoc,
@@ -26,35 +26,47 @@ import {
 } from "react-native";
 import { LineChart } from "react-native-gifted-charts";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AddMaintenanceModal, {
+  MAINTENANCE_TYPES,
+} from "../../components/AddMaintenanceModal";
 import AddParameterModal, {
   PARAMETERS,
 } from "../../components/AddParameterModal";
 import { AppTheme } from "../../constants/theme";
 import { auth, db, storage } from "../../firebaseConfig";
 
-// --- TIPOS DE DATOS ---
+// Interfaces
 interface Aquarium {
   id: string;
   name: string;
   imageUrl?: string;
+  volume?: number;
 }
 interface ParameterReading {
   id: string;
-  timestamp: any; // Firestore Timestamp
+  timestamp: any;
   value: number;
+}
+interface MaintenanceLog {
+  id: string;
+  timestamp: any;
+  type: keyof typeof MAINTENANCE_TYPES;
+  notes: string;
+  volume?: number;
+  units?: "liters" | "gallons";
+  smartNote?: string;
 }
 type ParameterKey = keyof typeof PARAMETERS;
 interface ParameterData {
   [key: string]: ParameterReading[];
 }
-// Tipo de dato para la gráfica
 interface ChartPoint {
   value: number;
   label?: string;
   dataPointText?: string;
 }
 
-// --- COMPONENTE DE LA GRÁFICA (CON MEJORAS) ---
+// Componente de Gráfica (sin cambios)
 const ParameterChart = ({
   name,
   data,
@@ -64,14 +76,9 @@ const ParameterChart = ({
   data: ChartPoint[];
   onAdd: () => void;
 }) => {
-  // CAMBIO 1: Lógica para mostrar la gráfica desde el primer punto.
   const showChart = data.length > 0;
-
-  // CAMBIO 2: Si solo hay un punto, lo duplicamos para que la librería dibuje el punto.
-  // Le quitamos la etiqueta al segundo para que no se muestre duplicada.
   const chartData =
     data.length === 1 ? [data[0], { ...data[0], label: undefined }] : data;
-
   return (
     <View style={styles.chartContainer}>
       <View style={styles.chartHeader}>
@@ -89,17 +96,14 @@ const ParameterChart = ({
           data={chartData}
           color={AppTheme.COLORS.secondary}
           thickness={3}
-          // Eje Y (vertical)
           yAxisTextStyle={{ color: AppTheme.COLORS.darkGray }}
           noOfSections={4}
-          // Eje X (horizontal)
           xAxisThickness={1}
           xAxisColor={AppTheme.COLORS.lightGray}
           xAxisLabelTextStyle={{
             color: AppTheme.COLORS.darkGray,
             fontSize: 10,
           }}
-          // Puntos de datos
           dataPointsColor={AppTheme.COLORS.primary}
           dataPointsRadius={4}
           isAnimated
@@ -115,54 +119,43 @@ const ParameterChart = ({
   );
 };
 
-// --- PANTALLA PRINCIPAL ---
 const AquariumDetailScreen = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [aquarium, setAquarium] = useState<Aquarium | null>(null);
   const [parameters, setParameters] = useState<ParameterData>({});
-  const [modalVisible, setModalVisible] = useState(false);
+  const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceLog[]>([]);
+  const [paramModalVisible, setParamModalVisible] = useState(false);
+  const [maintenanceModalVisible, setMaintenanceModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
-    // 1. Verificamos que tengamos un ID para el acuario.
     if (!id) {
-      console.log("No hay ID de acuario, volviendo atrás.");
       router.back();
       return;
     }
-
-    // 2. Obtenemos el usuario actual de forma segura.
     const currentUser = auth.currentUser;
     if (!currentUser) {
-      console.log("Usuario no autenticado, no se pueden cargar los datos.");
-      setIsLoading(false); // Dejamos de cargar si no hay usuario.
+      setIsLoading(false);
       return;
     }
 
-    // --- SUSCRIPCIÓN AL DOCUMENTO DEL ACUARIO ---
-    // (Esta parte no cambia)
     const aquariumDocRef = doc(db, "aquariums", id);
     const unsubscribeAquarium = onSnapshot(aquariumDocRef, (docSnap) => {
       if (docSnap.exists()) {
         setAquarium({ id: docSnap.id, ...docSnap.data() } as Aquarium);
       } else {
-        console.log("El acuario no existe.");
         router.back();
       }
-      // Solo dejamos de cargar cuando tenemos la info del acuario.
       setIsLoading(false);
     });
 
-    // --- SUSCRIPCIÓN A LOS PARÁMETROS (AHORA SEGURA) ---
     const paramsCollectionRef = collection(db, "aquariums", id, "parameters");
-    // 3. La consulta ahora filtra por el 'userId' para cumplir la regla de seguridad.
     const paramsQuery = query(
       paramsCollectionRef,
       where("userId", "==", currentUser.uid)
     );
-
     const unsubscribeParams = onSnapshot(
       paramsQuery,
       (snapshot) => {
@@ -170,17 +163,13 @@ const AquariumDetailScreen = () => {
         snapshot.docs.forEach((doc) => {
           const data = doc.data();
           const paramType = data.type;
-          if (!allParams[paramType]) {
-            allParams[paramType] = [];
-          }
+          if (!allParams[paramType]) allParams[paramType] = [];
           allParams[paramType].push({
             id: doc.id,
             value: data.value,
             timestamp: data.timestamp,
           });
         });
-
-        // Ordenamos los parámetros por fecha (esto no cambia)
         for (const paramType in allParams) {
           if (allParams[paramType] && allParams[paramType].length > 0) {
             allParams[paramType].sort(
@@ -190,30 +179,56 @@ const AquariumDetailScreen = () => {
         }
         setParameters(allParams);
       },
-      (error) => {
-        // 4. Añadimos un manejo de errores para la escucha de parámetros.
-        // Esto te ayudará a ver cualquier futuro error de Firestore en la consola.
-        console.error("Error al escuchar los parámetros:", error);
-      }
+      (error) => console.error("Error al escuchar los parámetros:", error)
     );
 
-    // --- FUNCIÓN DE LIMPIEZA ---
-    // Se ejecuta cuando el componente se desmonta para evitar fugas de memoria.
+    const logsCollectionRef = collection(
+      db,
+      "aquariums",
+      id,
+      "maintenance_logs"
+    );
+    const logsQuery = query(
+      logsCollectionRef,
+      where("userId", "==", currentUser.uid),
+      orderBy("timestamp", "desc")
+    );
+    const unsubscribeLogs = onSnapshot(
+      logsQuery,
+      (snapshot) => {
+        const logsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as MaintenanceLog[];
+        setMaintenanceLogs(logsData);
+      },
+      (error) => console.error("Error al escuchar la bitácora:", error)
+    );
+
     return () => {
       unsubscribeAquarium();
       unsubscribeParams();
+      unsubscribeLogs();
     };
-  }, [id]); // El efecto se volv
+  }, [id]);
 
   const handleSaveParameter = async (paramType: string, value: number) => {
-    if (!id) return;
+    const currentUser = auth.currentUser;
+    if (!id || !currentUser) {
+      console.error("Error: Acuario no identificado o usuario no autenticado.");
+      Alert.alert(
+        "Error",
+        "No se pudo guardar el dato. Por favor, reinicia la sesión."
+      );
+      return;
+    }
     try {
       const paramsRef = collection(db, "aquariums", id, "parameters");
       await addDoc(paramsRef, {
         type: paramType,
         value: value,
         timestamp: serverTimestamp(),
-        userId: auth.currentUser?.uid,
+        userId: currentUser.uid,
       });
       const key = paramType as ParameterKey;
       Alert.alert(
@@ -222,7 +237,67 @@ const AquariumDetailScreen = () => {
       );
     } catch (error) {
       console.error("Error al guardar el parámetro:", error);
-      Alert.alert("Error", "No se pudo guardar la lectura del parámetro.");
+      Alert.alert(
+        "Error",
+        "Ocurrió un problema al conectar con la base de datos."
+      );
+    }
+  };
+
+  const handleSaveMaintenance = async (type: string, data: any) => {
+    const currentUser = auth.currentUser;
+    if (!id || !currentUser) {
+      console.error("Error: Acuario no identificado o usuario no autenticado.");
+      Alert.alert(
+        "Error",
+        "No se pudo guardar el registro. Por favor, reinicia la sesión."
+      );
+      return;
+    }
+    let logData: any = {
+      type,
+      notes: data.notes,
+      timestamp: serverTimestamp(),
+      userId: currentUser.uid,
+    };
+    if (type === "water_change" && aquarium?.volume) {
+      logData.volume = data.volume;
+      logData.units = data.units;
+      const lastNitrate = parameters.no3?.[parameters.no3.length - 1]?.value;
+      const lastPhosphate = parameters.po4?.[parameters.po4.length - 1]?.value;
+      const totalVolume = aquarium.volume;
+      let changeVolume = data.volume;
+      if (data.units === "gallons") {
+        changeVolume = data.volume * 3.78541;
+      }
+      const reductionPercentage = changeVolume / totalVolume;
+      let smartNotesArray = [];
+      if (lastNitrate !== undefined) {
+        const nitrateReduction = (reductionPercentage * lastNitrate).toFixed(2);
+        smartNotesArray.push(`Puede reducir NO₃ en ~${nitrateReduction} ppm.`);
+      }
+      if (lastPhosphate !== undefined) {
+        const phosphateReduction = (
+          reductionPercentage * lastPhosphate
+        ).toFixed(3);
+        smartNotesArray.push(
+          `Puede reducir PO₄ en ~${phosphateReduction} ppm.`
+        );
+      }
+      if (smartNotesArray.length > 0) {
+        logData.smartNote = smartNotesArray.join(" ");
+      }
+    }
+    try {
+      const logsRef = collection(db, "aquariums", id, "maintenance_logs");
+      await addDoc(logsRef, logData);
+      Alert.alert("¡Éxito!", "El registro ha sido guardado.");
+    } catch (error) {
+      console.error("Error al guardar el registro:", error);
+      Alert.alert(
+        "Error",
+        "Ocurrió un problema al conectar con la base de datos."
+      );
     }
   };
 
@@ -287,15 +362,21 @@ const AquariumDetailScreen = () => {
     <SafeAreaView style={styles.container}>
       <Stack.Screen
         options={{
-          headerTitle: aquarium?.name || "Detalles del Acuario",
-          headerBackTitle: "Mis Acuarios", // <-- AÑADE ESTA LÍNEA
+          headerTitle: aquarium?.name || "Detalles",
+          headerBackTitle: "Mis Acuarios",
         }}
       />
       <AddParameterModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
+        visible={paramModalVisible}
+        onClose={() => setParamModalVisible(false)}
         onSave={handleSaveParameter}
       />
+      <AddMaintenanceModal
+        visible={maintenanceModalVisible}
+        onClose={() => setMaintenanceModalVisible(false)}
+        onSave={handleSaveMaintenance}
+      />
+
       <ScrollView contentContainerStyle={styles.content}>
         <TouchableOpacity onPress={pickImage} disabled={isUploading}>
           <View style={styles.photoContainer}>
@@ -320,12 +401,11 @@ const AquariumDetailScreen = () => {
             )}
           </View>
         </TouchableOpacity>
+
         <Text style={styles.sectionTitle}>Parámetros</Text>
         {Object.keys(PARAMETERS).map((key) => {
           const paramKey = key as ParameterKey;
           const paramData = parameters[paramKey] || [];
-
-          // CAMBIO 3: Preparamos los datos para la gráfica, incluyendo la etiqueta con la fecha.
           const dataForChart: ChartPoint[] = paramData.map((p) => {
             const date = p.timestamp
               ? new Date(p.timestamp.seconds * 1000)
@@ -338,22 +418,90 @@ const AquariumDetailScreen = () => {
               }),
             };
           });
-
           return (
             <ParameterChart
               key={paramKey}
               name={PARAMETERS[paramKey].name}
               data={dataForChart}
-              onAdd={() => setModalVisible(true)}
+              onAdd={() => setParamModalVisible(true)}
             />
           );
         })}
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Bitácora de Mantenimiento</Text>
+          <TouchableOpacity onPress={() => setMaintenanceModalVisible(true)}>
+            <FontAwesome
+              name="plus-circle"
+              size={24}
+              color={AppTheme.COLORS.primary}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {maintenanceLogs.length > 0 ? (
+          maintenanceLogs.map((log) => (
+            <View key={log.id} style={styles.logItem}>
+              <Text style={styles.logDate}>
+                {new Date(log.timestamp?.seconds * 1000).toLocaleString(
+                  "es-ES",
+                  { dateStyle: "long", timeStyle: "short" }
+                )}
+              </Text>
+              {log.type === "water_change" ? (
+                <>
+                  <Text style={styles.logType}>
+                    Cambio de Agua: {log.volume} {log.units}
+                  </Text>
+                  {log.smartNote && (
+                    <Text style={styles.smartNote}>💡 {log.smartNote}</Text>
+                  )}
+                  <Text style={styles.rodiNote}>
+                    Recuerda usar agua de RODI a 0 TDS.
+                  </Text>
+                  {log.notes && (
+                    <Text style={styles.logNotes}>Notas: {log.notes}</Text>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text style={styles.logType}>
+                    {MAINTENANCE_TYPES[log.type]}
+                  </Text>
+                  <Text style={styles.logNotes}>{log.notes}</Text>
+                </>
+              )}
+            </View>
+          ))
+        ) : (
+          <Text style={styles.noDataText}>
+            No hay registros de mantenimiento.
+          </Text>
+        )}
+        <Link
+          href={{
+            pathname: "/reminders",
+            params: { aquariumId: id, aquariumName: aquarium?.name },
+          }}
+          asChild
+        >
+          <TouchableOpacity style={styles.remindersButton}>
+            <FontAwesome
+              name="bell-o"
+              size={20}
+              color={AppTheme.COLORS.white}
+            />
+            <Text style={styles.remindersButtonText}>
+              Gestionar Recordatorios
+            </Text>
+          </TouchableOpacity>
+        </Link>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-// --- ESTILOS (SIN CAMBIOS) ---
+// --- ESTILOS (CON NUEVAS CLASES PARA LA BITÁCORA) ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: AppTheme.COLORS.background },
   centerContent: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -375,7 +523,11 @@ const styles = StyleSheet.create({
     marginTop: AppTheme.SIZES.base,
   },
   uploadIndicator: { position: "absolute" },
-  sectionTitle: { ...AppTheme.FONTS.h2, marginBottom: AppTheme.SIZES.margin },
+  sectionTitle: {
+    ...AppTheme.FONTS.h2,
+    marginBottom: AppTheme.SIZES.margin,
+    flex: 1,
+  },
   chartContainer: {
     backgroundColor: AppTheme.COLORS.white,
     borderRadius: AppTheme.SIZES.radius,
@@ -403,6 +555,70 @@ const styles = StyleSheet.create({
     ...AppTheme.FONTS.body2,
     color: AppTheme.COLORS.darkGray,
     textAlign: "center",
+    marginTop: 10,
+  },
+  // --- 👇 NUEVOS ESTILOS ---
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: AppTheme.SIZES.padding,
+  },
+  logItem: {
+    backgroundColor: AppTheme.COLORS.white,
+    borderRadius: AppTheme.SIZES.radius,
+    padding: AppTheme.SIZES.margin,
+    marginBottom: AppTheme.SIZES.margin,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+  },
+  logDate: {
+    ...AppTheme.FONTS.caption,
+    color: AppTheme.COLORS.darkGray,
+    marginBottom: 4,
+  },
+  logType: {
+    ...AppTheme.FONTS.h3,
+    fontSize: 16,
+    marginBottom: 6,
+  },
+  logNotes: {
+    ...AppTheme.FONTS.body2,
+    lineHeight: 22,
+  },
+  smartNote: {
+    ...AppTheme.FONTS.body2,
+    backgroundColor: "#E6F4FF", // Un azul claro
+    color: "#00529B", // Un azul oscuro
+    padding: 10,
+    borderRadius: AppTheme.SIZES.radius,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: "#B3D9FF",
+  },
+  rodiNote: {
+    ...AppTheme.FONTS.caption,
+    color: AppTheme.COLORS.darkGray,
+    fontStyle: "italic",
+    marginTop: 8,
+  },
+  remindersButton: {
+    backgroundColor: AppTheme.COLORS.secondary,
+    padding: 15,
+    borderRadius: AppTheme.SIZES.radius,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    marginTop: AppTheme.SIZES.padding,
+  },
+  remindersButtonText: {
+    ...AppTheme.FONTS.h3,
+    color: AppTheme.COLORS.white,
+    fontSize: 16,
+    marginLeft: 10,
   },
 });
 
