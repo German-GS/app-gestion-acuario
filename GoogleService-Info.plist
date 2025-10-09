@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>91058824770-piv7dgiijuvckiq1e53n9geoasj38b2a.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.91058824770-piv7dgiijuvckiq1e53n9geoasj38b2a</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>91058824770-ji7514ti365ilg1svgqaumcbg5oumjl7.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyCA8WG4cKPV0Zj_VKbWx-afnR9KesecqOU</string>
+	<key>GCM_SENDER_ID</key>
+	<string>91058824770</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.aquamind.app</string>
+	<key>PROJECT_ID</key>
+	<string>aquamind-c43cb</string>
+	<key>STORAGE_BUCKET</key>
+	<string>aquamind-c43cb.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:91058824770:ios:2f78d066873d549ed82fdb</string>
+</dict>
+</plist>

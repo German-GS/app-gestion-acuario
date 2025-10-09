@@ -11,57 +11,48 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.aquamind.app",
-      "jsEngine": "hermes"
+      "jsEngine": "hermes",
+       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png",
-        "jsEngine": "hermes"
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "package": "com.aquamind.app"
+      "package": "com.aquamind.app",
+      "jsEngine": "hermes"
     },
-  
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
     "extra": {
+      "router": {},
       "eas": {
         "projectId": "1b186bbe-733f-45c7-b8b3-9bf34933413d"
       }
-    },
-    "plugins": [
-      "expo-router"
-    ]
-  },
-  "web": {
-    "output": "static",
-    "favicon": "./assets/images/favicon.png"
-  },
-  "plugins": [
-    "expo-router",
-    [
-      "expo-splash-screen",
-      {
-        "image": "./assets/images/splash-icon.png",
-        "imageWidth": 200,
-        "resizeMode": "contain",
-        "backgroundColor": "#ffffff",
-        "dark": {
-          "backgroundColor": "#000000"
-        }
-      }
-    ],
-    "expo-font",
-    "react-native-reanimated/plugin"
-  ],
-  "experiments": {
-    "typedRoutes": true,
-    "reactCompiler": true
-  },
-  "extra": {
-    "router": {},
-    "eas": {
-      "projectId": "1b186bbe-733f-45c7-b8b3-9bf34933413d"
     }
   }
 }

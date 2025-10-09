@@ -9,7 +9,7 @@ const firebaseConfig = {
     apiKey: "AIzaSyD7JxdALa1sGkpVlYzyoMKTj6MUTUi_hQw",
     authDomain: "aquamind-c43cb.firebaseapp.com",
     projectId: "aquamind-c43cb",
-    storageBucket: "aquamind-c43cb.appspot.com",
+    storageBucket: "aquamind-c43cb.firebasestorage.app",
     messagingSenderId: "91058824770",
     appId: "1:91058824770:web:75bd34f2333055bdd82fdb",
     measurementId: "G-PQJXY4TFE2"

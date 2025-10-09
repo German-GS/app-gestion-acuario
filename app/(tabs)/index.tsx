@@ -213,6 +213,21 @@ const HomeScreen = () => {
       </View>
     );
   }
+  const EmptyState = () => (
+    <View style={styles.centerContent}>
+      <FontAwesome
+        name="tint" // Un ícono de gota, muy temático
+        size={60}
+        color={AppTheme.COLORS.primary}
+        style={{ marginBottom: AppTheme.SIZES.padding }}
+      />
+      <Text style={styles.titleEmpty}>Bienvenido a AquaMind</Text>
+      <Text style={styles.subtitle}>
+        Toca el botón '+' para añadir tu primer acuario y empezar a monitorear
+        la salud de tu ecosistema acuático.
+      </Text>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -239,7 +254,6 @@ const HomeScreen = () => {
   );
 };
 
-// ... (Los estilos se mantienen iguales)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: AppTheme.COLORS.background },
   centerContent: {
@@ -247,6 +261,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: AppTheme.SIZES.padding,
+  },
+  titleEmpty: {
+    ...AppTheme.FONTS.h2,
+    textAlign: "center",
+    marginBottom: AppTheme.SIZES.base,
   },
   subtitle: { ...AppTheme.FONTS.body1, textAlign: "center" },
   list: { padding: AppTheme.SIZES.padding },
