@@ -1,8 +1,15 @@
 // app/(auth)/login.js
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import { useRouter } from 'expo-router';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
-import { useEffect, useState } from 'react';
+import {
+  GoogleSignin,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
+import { useRouter } from "expo-router";
+import {
+  GoogleAuthProvider,
+  signInWithCredential,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,14 +22,14 @@ import {
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  View
-} from 'react-native';
-import { AppTheme } from '../../constants/theme';
-import { auth } from '../../firebaseConfig';
+  View,
+} from "react-native";
+import { AppTheme } from "../../constants/theme";
+import { auth } from "../../firebaseConfig";
 
 const LoginScreen = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
@@ -30,9 +37,10 @@ const LoginScreen = () => {
     // Configura Google Sign-In una sola vez.
     // El webClientId se usa para obtener el idToken y es indispensable.
     GoogleSignin.configure({
-      webClientId: '91058824770-aigfc59143jmeqfdi0rfus5kqngeqq18.apps.googleusercontent.com',
+      webClientId:
+        "91058824770-aigfc59143jmeqfdi0rfus5kqngeqq18.apps.googleusercontent.com",
       // 👇 AÑADE ESTA LÍNEA QUE FALTABA 👇
-      scopes: ['profile', 'email'], 
+      scopes: ["profile", "email"],
     });
   }, []);
 
@@ -46,32 +54,39 @@ const LoginScreen = () => {
       const idToken = userInfo.data?.idToken;
 
       if (!idToken) {
-          throw new Error("No se pudo obtener el idToken de la respuesta de Google.");
+        throw new Error(
+          "No se pudo obtener el idToken de la respuesta de Google."
+        );
       }
 
       const googleCredential = GoogleAuthProvider.credential(idToken);
       await signInWithCredential(auth, googleCredential);
-
     } catch (error) {
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        console.log('Inicio de sesión cancelado por el usuario');
+        console.log("Inicio de sesión cancelado por el usuario");
       } else if (error.code === statusCodes.IN_PROGRESS) {
-        console.log('El inicio de sesión ya está en progreso');
+        console.log("El inicio de sesión ya está en progreso");
       } else {
         console.error("Error detallado de Google Sign-In:", error);
-        Alert.alert('Error', 'Ocurrió un error durante el inicio de sesión con Google.');
+        Alert.alert(
+          "Error",
+          "Ocurrió un error durante el inicio de sesión con Google."
+        );
       }
     }
   };
-  
+
   const handleEmailLogin = () => {
     if (!email || !password) {
-      Alert.alert("Campos incompletos", "Por favor, introduce tu correo y contraseña.");
+      Alert.alert(
+        "Campos incompletos",
+        "Por favor, introduce tu correo y contraseña."
+      );
       return;
     }
     setIsLoading(true);
     signInWithEmailAndPassword(auth, email, password)
-      .catch(error => {
+      .catch((error) => {
         Alert.alert("Error", "Las credenciales son incorrectas.");
       })
       .finally(() => {
@@ -87,7 +102,7 @@ const LoginScreen = () => {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.innerContainer}>
           <Image
-            source={require('../../assets/images/logo.png')}
+            source={require("../../assets/images/logo.png")}
             style={styles.logo}
           />
           <Text style={styles.title}>Bienvenido a AquaMind</Text>
@@ -110,7 +125,11 @@ const LoginScreen = () => {
             secureTextEntry
           />
 
-          <TouchableOpacity style={styles.button} onPress={handleEmailLogin} disabled={isLoading}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={handleEmailLogin}
+            disabled={isLoading}
+          >
             {isLoading ? (
               <ActivityIndicator color={AppTheme.COLORS.white} />
             ) : (
@@ -118,15 +137,17 @@ const LoginScreen = () => {
             )}
           </TouchableOpacity>
 
-           <TouchableOpacity
+          <TouchableOpacity
             style={[styles.button, styles.googleButton]}
             onPress={handleGoogleLogin}
           >
             <Text style={styles.buttonText}>🚀 Iniciar con Google</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-            <Text style={styles.linkText}>¿No tienes una cuenta? Regístrate</Text>
+          <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
+            <Text style={styles.linkText}>
+              ¿No tienes una cuenta? Regístrate
+            </Text>
           </TouchableOpacity>
         </View>
       </TouchableWithoutFeedback>
@@ -141,20 +162,20 @@ const styles = StyleSheet.create({
   },
   innerContainer: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: AppTheme.SIZES.padding,
     backgroundColor: AppTheme.COLORS.background,
   },
   logo: {
     width: 120,
     height: 120,
-    resizeMode: 'contain',
-    alignSelf: 'center',
+    resizeMode: "contain",
+    alignSelf: "center",
     marginBottom: AppTheme.SIZES.padding,
   },
   title: {
     ...AppTheme.FONTS.h1,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: AppTheme.SIZES.padding,
   },
   input: {
@@ -171,13 +192,13 @@ const styles = StyleSheet.create({
     backgroundColor: AppTheme.COLORS.primary,
     padding: 15,
     borderRadius: AppTheme.SIZES.radius,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: AppTheme.SIZES.margin,
     height: 55,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   googleButton: {
-    backgroundColor: '#4285F4', // Color de Google
+    backgroundColor: "#4285F4", // Color de Google
     marginTop: 10,
   },
   buttonText: {
@@ -188,7 +209,7 @@ const styles = StyleSheet.create({
   linkText: {
     ...AppTheme.FONTS.body2,
     color: AppTheme.COLORS.primary,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: AppTheme.SIZES.padding,
   },
 });

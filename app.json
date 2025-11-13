@@ -22,7 +22,9 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "package": "com.aquamind.app",
-      "jsEngine": "hermes"
+      "jsEngine": "hermes",
+      "googleServicesFile": "./google-services.json"
+
     },
     "web": {
       "output": "static",
