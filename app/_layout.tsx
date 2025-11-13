@@ -1,7 +1,8 @@
 // app/_layout.js
+
 import { SplashScreen, Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect } from "react";
-import { useAuth } from "../hooks/useAuth";
+import { useAuth } from "../hooks/useAuth"; // Asegúrate que la ruta a useAuth sea correcta
 
 SplashScreen.preventAutoHideAsync();
 
@@ -10,36 +11,29 @@ export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
 
-  // --- LÓGICA DE REDIRECCIÓN CORREGIDA ---
   useEffect(() => {
-    // Si todavía estamos verificando al usuario, no hacemos nada.
-    if (isLoading) return;
+    if (isLoading) {
+      return; // No hagas nada mientras carga
+    }
 
-    // `inAuthGroup` nos dice si la ruta actual está dentro de la carpeta (auth)
     const inAuthGroup = segments[0] === "(auth)";
 
     if (user && inAuthGroup) {
-      // Si el usuario ya está logueado PERO está en la pantalla de login/registro,
-      // lo mandamos al dashboard.
+      // Si el usuario está logueado y en la pantalla de auth, llévalo a la app.
       router.replace("/(tabs)");
-    } else if (!user) {
-      // Si no hay usuario en absoluto, lo mandamos al login.
-      // Esto protege todas las pantallas de la app.
+    } else if (!user && !inAuthGroup) {
+      // Si el usuario NO está logueado y NO está en la pantalla de auth, llévalo a login.
       router.replace("/(auth)/login");
     }
 
-    // Una vez que la lógica termina, podemos ocultar la pantalla de carga.
-    if (!isLoading) {
-      SplashScreen.hideAsync();
-    }
-  }, [user, isLoading, segments]); // <-- IMPORTANTE: Añadimos 'segments' aquí
+    // Oculta la pantalla de carga una vez que la lógica haya terminado.
+    SplashScreen.hideAsync();
+  }, [user, isLoading, segments]);
 
-  // Si está cargando, no mostramos nada para evitar parpadeos
   if (isLoading) {
-    return null;
+    return null; // Muestra una pantalla vacía en lugar del layout para evitar parpadeos
   }
 
-  // El Stack no cambia
   return (
     <Stack>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -51,12 +45,11 @@ export default function RootLayout() {
           headerTitle: "Nuevo Acuario",
         }}
       />
-      {/* --- 👇 AÑADE ESTA CONFIGURACIÓN 👇 --- */}
       <Stack.Screen
         name="reminders"
         options={{
           presentation: "modal",
-          headerShown: false, // La pantalla ya tiene su propia cabecera
+          headerShown: false,
         }}
       />
     </Stack>

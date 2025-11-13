@@ -87,6 +87,7 @@ const RegisterScreen = () => {
             style={styles.input}
             placeholder="Nombre de Usuario"
             value={username}
+            placeholderTextColor={AppTheme.COLORS.darkGray}
             onChangeText={setUsername}
             autoCapitalize="words"
           />
@@ -97,6 +98,7 @@ const RegisterScreen = () => {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            placeholderTextColor={AppTheme.COLORS.darkGray}
             textContentType="emailAddress"
             autoComplete="email"
           />
@@ -105,6 +107,7 @@ const RegisterScreen = () => {
             placeholder="Contraseña (mín. 6 caracteres)"
             value={password}
             onChangeText={setPassword}
+            placeholderTextColor={AppTheme.COLORS.darkGray}
             secureTextEntry
             textContentType="newPassword"
             autoComplete="password-new"
@@ -114,6 +117,7 @@ const RegisterScreen = () => {
             placeholder="Confirmar Contraseña"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
+            placeholderTextColor={AppTheme.COLORS.darkGray}
             secureTextEntry
             textContentType="newPassword"
             autoComplete="password-new"

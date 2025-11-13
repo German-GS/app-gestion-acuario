@@ -84,6 +84,7 @@ const RemindersScreen = () => {
   
   const handleSaveReminder = async ({ task, date, frequency }) => {
     if (!auth.currentUser || !aquariumId) return;
+    const finalAquariumName = aquariumName || "tu acuario";
 
     // 1. Programar la notificación local
     const trigger = new Date(date);

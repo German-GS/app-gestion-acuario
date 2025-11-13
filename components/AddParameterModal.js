@@ -2,14 +2,14 @@
 import { Picker } from '@react-native-picker/picker';
 import React, { useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { AppTheme } from '../constants/theme';
 
@@ -69,6 +69,7 @@ const AddParameterModal = ({ visible, onClose, onSave }) => {
           <TextInput
             style={styles.input}
             placeholder="Introduce el valor medido"
+            placeholderTextColor={AppTheme.COLORS.darkGray}
             keyboardType="decimal-pad" // Mejor para valores numéricos
             value={value}
             onChangeText={setValue}

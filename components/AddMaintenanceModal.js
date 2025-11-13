@@ -2,15 +2,15 @@
 import { Picker } from '@react-native-picker/picker';
 import React, { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { AppTheme } from '../constants/theme';
 
@@ -86,6 +86,7 @@ const AddMaintenanceModal = ({ visible, onClose, onSave }) => {
                   style={[styles.input, styles.volumeInput]}
                   placeholder="Ej: 20"
                   keyboardType="numeric"
+                  placeholderTextColor={AppTheme.COLORS.darkGray}
                   value={volume}
                   onChangeText={setVolume}
                 />
@@ -97,7 +98,7 @@ const AddMaintenanceModal = ({ visible, onClose, onSave }) => {
                 </View>
               </View>
               <Text style={styles.label}>Notas Adicionales (Opcional)</Text>
-              <TextInput style={styles.input} value={notes} onChangeText={setNotes} />
+              <TextInput style={styles.input} value={notes} onChangeText={setNotes} placeholderTextColor={AppTheme.COLORS.darkGray}/>
             </>
           ) : (
             <>
@@ -107,6 +108,7 @@ const AddMaintenanceModal = ({ visible, onClose, onSave }) => {
                 placeholder="Describe el evento..."
                 multiline={true}
                 value={notes}
+                placeholderTextColor={AppTheme.COLORS.darkGray}
                 onChangeText={setNotes}
               />
             </>

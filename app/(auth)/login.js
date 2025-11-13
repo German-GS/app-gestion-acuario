@@ -97,12 +97,14 @@ const LoginScreen = () => {
             placeholder="Correo Electrónico"
             value={email}
             onChangeText={setEmail}
+            placeholderTextColor={AppTheme.COLORS.darkGray}
             keyboardType="email-address"
             autoCapitalize="none"
           />
           <TextInput
             style={styles.input}
             placeholder="Contraseña"
+            placeholderTextColor={AppTheme.COLORS.darkGray}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
