@@ -1,6 +1,6 @@
 // components/AddParameterModal.js
-import { Picker } from '@react-native-picker/picker';
-import React, { useState } from 'react';
+import { Picker } from "@react-native-picker/picker";
+import React, { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -9,33 +9,39 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
-} from 'react-native';
-import { AppTheme } from '../constants/theme';
+  View,
+} from "react-native";
+import { AppTheme } from "../constants/theme";
 
 // Definimos los parámetros con sus unidades
 export const PARAMETERS = {
-  kh: { name: 'Alcalinidad (KH)', unit: 'dKH' },
-  ca: { name: 'Calcio (Ca)', unit: 'ppm' },
-  mg: { name: 'Magnesio (Mg)', unit: 'ppm' },
-  no3: { name: 'Nitratos (NO3)', unit: 'ppm' },
-  po4: { name: 'Fosfatos (PO4)', unit: 'ppm' },
-  temp: { name: 'Temperatura', unit: '°C' },
+  kh: { name: "Alcalinidad (KH)", unit: "dKH" },
+  ca: { name: "Calcio (Ca)", unit: "ppm" },
+  mg: { name: "Magnesio (Mg)", unit: "ppm" },
+  no3: { name: "Nitratos (NO3)", unit: "ppm" },
+  po4: { name: "Fosfatos (PO4)", unit: "ppm" },
+  temp: { name: "Temperatura", unit: "°C" },
 };
 
-const AddParameterModal = ({ visible, onClose, onSave }) => {
+const AddParameterModal = ({ visible, onClose, onSave, initialParam }) => {
   // Aseguramos que siempre haya una selección válida
-  const [selectedParam, setSelectedParam] = useState('kh');
-  const [value, setValue] = useState('');
+  const [selectedParam, setSelectedParam] = useState("kh");
+  const [value, setValue] = useState("");
+
+  useEffect(() => {
+    if (visible && initialParam) {
+      setSelectedParam(initialParam);
+    }
+  }, [visible, initialParam]);
 
   const handleSave = () => {
     if (!value.trim()) {
       // Usamos Alert en lugar de alert
-      Alert.alert('Valor Requerido', 'Por favor, introduce un valor.');
+      Alert.alert("Valor Requerido", "Por favor, introduce un valor.");
       return;
     }
     onSave(selectedParam, parseFloat(value));
-    setValue(''); // Limpiamos el valor
+    setValue(""); // Limpiamos el valor
     onClose(); // Cerramos el modal
   };
 
@@ -47,7 +53,7 @@ const AddParameterModal = ({ visible, onClose, onSave }) => {
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.centeredView}
       >
         <View style={styles.modalView}>
@@ -65,7 +71,9 @@ const AddParameterModal = ({ visible, onClose, onSave }) => {
             </Picker>
           </View>
 
-          <Text style={styles.label}>Valor ({PARAMETERS[selectedParam]?.unit || ''})</Text>
+          <Text style={styles.label}>
+            Valor ({PARAMETERS[selectedParam]?.unit || ""})
+          </Text>
           <TextInput
             style={styles.input}
             placeholder="Introduce el valor medido"
@@ -96,27 +104,27 @@ const AddParameterModal = ({ visible, onClose, onSave }) => {
 const styles = StyleSheet.create({
   centeredView: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalView: {
     margin: 20,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 20,
     padding: 25,
-    alignItems: 'stretch',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2, },
+    alignItems: "stretch",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    width: '90%',
+    width: "90%",
   },
   modalTitle: {
     ...AppTheme.FONTS.h2,
     marginBottom: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
   label: {
     ...AppTheme.FONTS.body2,
@@ -140,8 +148,8 @@ const styles = StyleSheet.create({
     backgroundColor: AppTheme.COLORS.white,
   },
   buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: 10,
   },
   button: {
@@ -151,17 +159,16 @@ const styles = StyleSheet.create({
     elevation: 2,
     flex: 1,
     marginHorizontal: 5,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cancelButton: {
     backgroundColor: AppTheme.COLORS.darkGray,
   },
   buttonText: {
     ...AppTheme.FONTS.h3,
-    color: 'white',
+    color: "white",
     fontSize: 16,
   },
 });
 
 export default AddParameterModal;
-

@@ -33,7 +33,8 @@ import { auth, db } from "../firebaseConfig";
 // Configuración de notificaciones
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -141,7 +142,7 @@ const RemindersScreen = () => {
         repeats: true,
       };
     } else {
-      triggerConfig = trigger;
+      triggerConfig = { date: trigger };
     }
 
     const notificationId = await Notifications.scheduleNotificationAsync({

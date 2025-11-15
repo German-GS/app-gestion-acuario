@@ -64,6 +64,7 @@ interface ChartPoint {
   value: number;
   label?: string;
   dataPointText?: string;
+  hideDataPoint?: boolean;
 }
 
 // Componente de Gráfica (sin cambios)
@@ -77,8 +78,23 @@ const ParameterChart = ({
   onAdd: () => void;
 }) => {
   const showChart = data.length > 0;
-  const chartData =
-    data.length === 1 ? [data[0], { ...data[0], label: undefined }] : data;
+
+  // 1. Maneja el caso de 1 solo punto (como ya tenías)
+  let processedData =
+    data.length === 1 ? [data[0], { ...data[0], label: undefined }] : [...data];
+
+  // 2. Si hay datos, añadimos un punto fantasma al final
+  if (data.length > 0) {
+    // Obtenemos el último valor real para que la línea no "salte"
+    const lastValue = data[data.length - 1].value;
+
+    processedData.push({
+      value: lastValue, // Usa el último valor
+      label: " ", // Una etiqueta con espacio para que ocupe lugar
+      hideDataPoint: true, // ¡Esta es la clave! Oculta el punto
+    });
+  }
+
   return (
     <View style={styles.chartContainer}>
       <View style={styles.chartHeader}>
@@ -93,7 +109,7 @@ const ParameterChart = ({
       </View>
       {showChart ? (
         <LineChart
-          data={chartData}
+          data={processedData} // <-- 3. Usa el array procesado
           color={AppTheme.COLORS.secondary}
           thickness={3}
           yAxisTextStyle={{ color: AppTheme.COLORS.darkGray }}
@@ -107,6 +123,7 @@ const ParameterChart = ({
           dataPointsColor={AppTheme.COLORS.primary}
           dataPointsRadius={4}
           isAnimated
+          // (Asegúrate de quitar 'spacingEnd' o 'paddingRight' de aquí)
         />
       ) : (
         <View style={styles.noDataContainer}>
@@ -125,7 +142,7 @@ const AquariumDetailScreen = () => {
   const [aquarium, setAquarium] = useState<Aquarium | null>(null);
   const [parameters, setParameters] = useState<ParameterData>({});
   const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceLog[]>([]);
-  const [paramModalVisible, setParamModalVisible] = useState(false);
+  const [paramToEdit, setParamToEdit] = useState<ParameterKey | null>(null);
   const [maintenanceModalVisible, setMaintenanceModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -367,8 +384,9 @@ const AquariumDetailScreen = () => {
         }}
       />
       <AddParameterModal
-        visible={paramModalVisible}
-        onClose={() => setParamModalVisible(false)}
+        visible={paramToEdit !== null} // Se muestra si paramToEdit NO es nulo
+        initialParam={paramToEdit} // Pasamos el parámetro seleccionado
+        onClose={() => setParamToEdit(null)} // Al cerrar, lo volvemos nulo
         onSave={handleSaveParameter}
       />
       <AddMaintenanceModal
@@ -423,7 +441,7 @@ const AquariumDetailScreen = () => {
               key={paramKey}
               name={PARAMETERS[paramKey].name}
               data={dataForChart}
-              onAdd={() => setParamModalVisible(true)}
+              onAdd={() => setParamToEdit(paramKey)}
             />
           );
         })}
@@ -501,7 +519,6 @@ const AquariumDetailScreen = () => {
   );
 };
 
-// --- ESTILOS (CON NUEVAS CLASES PARA LA BITÁCORA) ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: AppTheme.COLORS.background },
   centerContent: { flex: 1, justifyContent: "center", alignItems: "center" },
