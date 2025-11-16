@@ -16,10 +16,11 @@ import { RANGES } from "../../constants/parameterRanges";
 import { RECOMMENDATIONS } from "../../constants/recommendations";
 import { AppTheme } from "../../constants/theme";
 import { db } from "../../firebaseConfig";
-import { useAquariumStore } from "../../store/aquariumStore"; // <-- 1. Importa el store
+import { useAquariumStore } from "../../store/aquariumStore";
 
-// --- (Interfaces y getAquariumStatus sin cambios) ---
-// ... (puedes mantener las interfaces y la función getAquariumStatus exactamente como estaban)
+// ──────────────────────────────────────
+// Tipos e interpretación de estado
+// ──────────────────────────────────────
 interface Aquarium {
   id: string;
   name: string;
@@ -28,12 +29,12 @@ interface Aquarium {
   subType: string;
   latestParameters?: { [key: string]: number };
 }
+
 const getAquariumStatus = (
   aquarium: Aquarium
 ): { text: string; color: string; recommendations?: string[] } => {
-  const latestParams = aquarium.latestParameters; // Guardamos en una variable para simpleza
+  const latestParams = aquarium.latestParameters;
 
-  // Si no hay parámetros, retornamos el estado inicial
   if (!latestParams || Object.keys(latestParams).length === 0) {
     return {
       text: "Registra un parámetro para ver el estado",
@@ -52,22 +53,22 @@ const getAquariumStatus = (
   const alerts: string[] = [];
   const uniqueRecommendations = new Set<string>();
 
-  // --- 👇 ESTE ES EL BUCLE CORREGIDO 👇 ---
-  // Usamos Object.keys() para asegurar que 'paramKey' sea siempre un string
   for (const paramKey of Object.keys(latestParams)) {
     const key = paramKey as keyof typeof ranges & keyof typeof RECOMMENDATIONS;
     const paramConfig = ranges[key];
-    const currentValue = latestParams[key]; // Ahora podemos acceder de forma segura
+    const currentValue = latestParams[key];
 
     if (paramConfig && currentValue !== undefined) {
       if (currentValue < paramConfig.min) {
         alerts.push(`${paramConfig.name} bajo`);
-        if (RECOMMENDATIONS[key]?.low)
+        if (RECOMMENDATIONS[key]?.low) {
           uniqueRecommendations.add(RECOMMENDATIONS[key].low);
+        }
       } else if (currentValue > paramConfig.max) {
         alerts.push(`${paramConfig.name} alto`);
-        if (RECOMMENDATIONS[key]?.high)
+        if (RECOMMENDATIONS[key]?.high) {
           uniqueRecommendations.add(RECOMMENDATIONS[key].high);
+        }
       }
     }
   }
@@ -86,11 +87,20 @@ const getAquariumStatus = (
   };
 };
 
+// ──────────────────────────────────────
+// Pantalla principal
+// ──────────────────────────────────────
 const HomeScreen = () => {
   const router = useRouter();
-  // --- 2. Usa el estado y las acciones del store ---
   const { aquariums, isLoading, fetchAquariums, removeAquarium } =
     useAquariumStore();
+
+  // Totales para el mini-dashboard
+  const totalVolume = aquariums.reduce((sum, a) => sum + (a.volume || 0), 0);
+  const marineCount = aquariums.filter((a) => a.mainType === "marine").length;
+  const freshwaterCount = aquariums.filter(
+    (a) => a.mainType === "freshwater"
+  ).length;
 
   const handleDelete = (aquariumId: string, aquariumName: string) => {
     Alert.alert(
@@ -103,7 +113,7 @@ const HomeScreen = () => {
           onPress: async () => {
             try {
               await deleteDoc(doc(db, "aquariums", aquariumId));
-              removeAquarium(aquariumId); // <-- 3. Llama a la acción del store
+              removeAquarium(aquariumId);
             } catch (error) {
               console.error("Error al eliminar el acuario:", error);
               Alert.alert("Error", "No se pudo eliminar el acuario.");
@@ -115,16 +125,14 @@ const HomeScreen = () => {
     );
   };
 
-  // --- 4. El `useFocusEffect` ahora solo llama a la acción de fetch ---
   useFocusEffect(
     useCallback(() => {
       fetchAquariums();
-    }, [])
+    }, [fetchAquariums])
   );
 
-  // El resto del componente (AquariumCard y el return) no necesita cambios
+  // Tarjeta de acuario
   const AquariumCard = ({ item }: { item: Aquarium }) => {
-    // ... (El código de AquariumCard se mantiene igual)
     const status = getAquariumStatus(item);
     const params = item.latestParameters || {};
 
@@ -138,6 +146,7 @@ const HomeScreen = () => {
               </Text>
             </TouchableOpacity>
           </Link>
+
           <TouchableOpacity
             onPress={() => handleDelete(item.id, item.name)}
             style={styles.deleteButton}
@@ -149,9 +158,9 @@ const HomeScreen = () => {
             />
           </TouchableOpacity>
         </View>
+
         <Link href={`/aquarium/${item.id}`} asChild>
           <TouchableOpacity>
-            {/* --- 👇 MODIFICADO: AÑADIMOS PO4 A LA VISTA DE LA TARJETA 👇 --- */}
             <View style={styles.cardBody}>
               <View style={styles.parameter}>
                 <Text style={styles.parameterLabel}>KH:</Text>
@@ -174,6 +183,7 @@ const HomeScreen = () => {
                 <Text style={styles.parameterText}>{params.po4 ?? "--"}</Text>
               </View>
             </View>
+
             <View style={styles.cardFooter}>
               <View
                 style={[
@@ -183,6 +193,7 @@ const HomeScreen = () => {
               />
               <Text style={styles.alertText}>{status.text}</Text>
             </View>
+
             {status.recommendations &&
               status.recommendations.map((rec, index) => (
                 <View
@@ -206,6 +217,22 @@ const HomeScreen = () => {
     );
   };
 
+  const EmptyState = () => (
+    <View style={styles.centerContent}>
+      <FontAwesome
+        name="tint"
+        size={60}
+        color={AppTheme.COLORS.primary}
+        style={{ marginBottom: AppTheme.SIZES.padding }}
+      />
+      <Text style={styles.titleEmpty}>Bienvenido a AquaMind</Text>
+      <Text style={styles.subtitle}>
+        Toca el botón "+" para añadir tu primer acuario y empezar a monitorear
+        la salud de tu ecosistema acuático.
+      </Text>
+    </View>
+  );
+
   if (isLoading) {
     return (
       <View style={styles.centerContent}>
@@ -213,37 +240,38 @@ const HomeScreen = () => {
       </View>
     );
   }
-  const EmptyState = () => (
-    <View style={styles.centerContent}>
-      <FontAwesome
-        name="tint" // Un ícono de gota, muy temático
-        size={60}
-        color={AppTheme.COLORS.primary}
-        style={{ marginBottom: AppTheme.SIZES.padding }}
-      />
-      <Text style={styles.titleEmpty}>Bienvenido a AquaMind</Text>
-      <Text style={styles.subtitle}>
-        Toca el botón '+' para añadir tu primer acuario y empezar a monitorear
-        la salud de tu ecosistema acuático.
-      </Text>
-    </View>
-  );
 
   return (
     <View style={styles.container}>
       {aquariums.length === 0 ? (
-        <View style={styles.centerContent}>
-          <Text style={styles.subtitle}>
-            Crea tu primer acuario para empezar a registrar.
-          </Text>
-        </View>
+        <EmptyState />
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
+          {/* ───── Mini-dashboard superior ───── */}
+          <View style={styles.dashboardHeader}>
+            <Text style={styles.dashboardTitle}>Mis Acuarios</Text>
+            <Text style={styles.dashboardSubtitle}>
+              Volumen total: {totalVolume} L
+            </Text>
+            <View style={styles.chipsRow}>
+              <View style={styles.chip}>
+                <Text style={styles.chipText}>Marinos: {marineCount}</Text>
+              </View>
+              <View style={styles.chip}>
+                <Text style={styles.chipText}>
+                  Agua dulce: {freshwaterCount}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* ───── Tarjetas de acuarios ───── */}
           {aquariums.map((item) => (
             <AquariumCard key={item.id} item={item} />
           ))}
         </ScrollView>
       )}
+
       <TouchableOpacity
         style={styles.floatingButton}
         onPress={() => router.push("/createAquarium")}
@@ -254,21 +282,63 @@ const HomeScreen = () => {
   );
 };
 
+// ──────────────────────────────────────
+// Estilos
+// ──────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: AppTheme.COLORS.background },
+
   centerContent: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: AppTheme.SIZES.padding,
   },
+
   titleEmpty: {
     ...AppTheme.FONTS.h2,
     textAlign: "center",
     marginBottom: AppTheme.SIZES.base,
   },
-  subtitle: { ...AppTheme.FONTS.body1, textAlign: "center" },
-  list: { padding: AppTheme.SIZES.padding },
+  subtitle: {
+    ...AppTheme.FONTS.body1,
+    textAlign: "center",
+  },
+
+  list: {
+    padding: AppTheme.SIZES.padding,
+    paddingBottom: 90,
+  },
+
+  // ─ Dashboard superior ─
+  dashboardHeader: {
+    marginBottom: AppTheme.SIZES.padding,
+  },
+  dashboardTitle: {
+    ...AppTheme.FONTS.h1,
+    marginBottom: 4,
+  },
+  dashboardSubtitle: {
+    ...AppTheme.FONTS.body2,
+    color: AppTheme.COLORS.darkGray,
+    marginBottom: 8,
+  },
+  chipsRow: {
+    flexDirection: "row",
+    columnGap: 8,
+  },
+  chip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: AppTheme.COLORS.lightGray,
+  },
+  chipText: {
+    ...AppTheme.FONTS.caption,
+    color: AppTheme.COLORS.darkGray,
+  },
+
+  // ─ Tarjetas ─
   card: {
     backgroundColor: AppTheme.COLORS.white,
     borderRadius: AppTheme.SIZES.radius * 1.5,
@@ -279,6 +349,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 5,
+    borderLeftWidth: 4,
+    borderLeftColor: AppTheme.COLORS.secondary,
   },
   cardHeader: {
     flexDirection: "row",
@@ -286,30 +358,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: AppTheme.SIZES.margin,
   },
-  cardTitle: { ...AppTheme.FONTS.h3, flex: 1 },
-  deleteButton: { padding: 8 },
-  tag: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: AppTheme.SIZES.radius,
+  cardTitle: {
+    ...AppTheme.FONTS.h3,
+    flex: 1,
   },
-  tagMarine: { backgroundColor: "#FFE0EE" },
-  tagFreshwater: { backgroundColor: "#E0FFF0" },
-  tagText: { ...AppTheme.FONTS.caption, fontWeight: "bold" },
+  deleteButton: {
+    padding: 8,
+  },
+
   cardBody: {
     flexDirection: "row",
     justifyContent: "space-around",
     marginBottom: AppTheme.SIZES.margin,
     flexWrap: "wrap",
-  }, // Añadido flexWrap
+  },
   parameter: {
     flexDirection: "row",
     alignItems: "center",
     marginHorizontal: 5,
     marginBottom: 5,
-  }, // Añadido margen
-  parameterText: { ...AppTheme.FONTS.body2, marginLeft: 6 },
-  parameterLabel: { ...AppTheme.FONTS.body2, fontWeight: "bold" },
+  },
+  parameterLabel: {
+    ...AppTheme.FONTS.body2,
+    fontWeight: "bold",
+  },
+  parameterText: {
+    ...AppTheme.FONTS.body2,
+    marginLeft: 6,
+  },
+
   cardFooter: {
     flexDirection: "row",
     alignItems: "center",
@@ -317,12 +394,18 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: AppTheme.COLORS.lightGray,
   },
-  alertIndicator: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
+  alertIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
   alertText: {
     ...AppTheme.FONTS.caption,
     flex: 1,
     color: AppTheme.COLORS.darkGray,
   },
+
   floatingButton: {
     position: "absolute",
     bottom: 30,
@@ -335,6 +418,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 8,
   },
+
   recommendationContainer: {
     flexDirection: "row",
     alignItems: "flex-start",

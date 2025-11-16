@@ -13,77 +13,98 @@ import {
 } from "react-native";
 import { AppTheme } from "../constants/theme";
 
-// Definimos los parámetros con sus unidades
+// 👇 Mismo objeto que usas en [id].tsx
 export const PARAMETERS = {
   kh: { name: "Alcalinidad (KH)", unit: "dKH" },
   ca: { name: "Calcio (Ca)", unit: "ppm" },
   mg: { name: "Magnesio (Mg)", unit: "ppm" },
   no3: { name: "Nitratos (NO3)", unit: "ppm" },
   po4: { name: "Fosfatos (PO4)", unit: "ppm" },
-  temp: { name: "Temperatura", unit: "°C" },
 };
 
-const AddParameterModal = ({ visible, onClose, onSave, initialParam }) => {
-  // Aseguramos que siempre haya una selección válida
-  const [selectedParam, setSelectedParam] = useState("kh");
+const AddParameterModal = ({ visible, initialParam, onClose, onSave }) => {
+  const [selectedParam, setSelectedParam] = useState(initialParam || "kh");
   const [value, setValue] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (visible && initialParam) {
+    if (initialParam) {
       setSelectedParam(initialParam);
     }
-  }, [visible, initialParam]);
+    setValue("");
+    setError("");
+  }, [initialParam, visible]);
 
   const handleSave = () => {
-    if (!value.trim()) {
-      // Usamos Alert en lugar de alert
-      Alert.alert("Valor Requerido", "Por favor, introduce un valor.");
+    const numericValue = parseFloat(value.replace(",", "."));
+    if (isNaN(numericValue)) {
+      setError("Introduce un valor numérico válido.");
       return;
     }
-    onSave(selectedParam, parseFloat(value));
-    setValue(""); // Limpiamos el valor
-    onClose(); // Cerramos el modal
+    setError("");
+    onSave(selectedParam, numericValue);
+    onClose();
   };
+
+  const unit = PARAMETERS[selectedParam]?.unit || "";
 
   return (
     <Modal
-      animationType="slide"
-      transparent={true}
       visible={visible}
+      animationType="fade"
+      transparent
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.centeredView}
+        style={styles.backdrop}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={styles.modalView}>
+        <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>Añadir Nueva Lectura</Text>
 
+          {/* Label Parámetro */}
           <Text style={styles.label}>Parámetro</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={selectedParam}
-              onValueChange={(itemValue) => setSelectedParam(itemValue)}
-            >
-              {Object.entries(PARAMETERS).map(([key, { name }]) => (
-                <Picker.Item key={key} label={name} value={key} />
-              ))}
-            </Picker>
+
+          {/* Contenedor del Picker con altura fija para que no corte el texto */}
+          <View
+            style={[
+              styles.pickerOuter,
+              Platform.OS === "android" && styles.pickerOuterAndroid,
+            ]}
+          >
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={selectedParam}
+                onValueChange={(itemValue) => setSelectedParam(itemValue)}
+                mode="dropdown"
+                dropdownIconColor={AppTheme.COLORS.darkGray}
+                style={styles.picker}
+              >
+                {Object.keys(PARAMETERS).map((key) => (
+                  <Picker.Item
+                    key={key}
+                    label={PARAMETERS[key].name}
+                    value={key}
+                  />
+                ))}
+              </Picker>
+            </View>
           </View>
 
-          <Text style={styles.label}>
-            Valor ({PARAMETERS[selectedParam]?.unit || ""})
-          </Text>
+          {/* Valor */}
+          <Text style={styles.label}>Valor ({unit || "ppm"})</Text>
           <TextInput
             style={styles.input}
             placeholder="Introduce el valor medido"
-            placeholderTextColor={AppTheme.COLORS.darkGray}
-            keyboardType="decimal-pad" // Mejor para valores numéricos
+            keyboardType="numeric"
             value={value}
             onChangeText={setValue}
           />
 
-          <View style={styles.buttonContainer}>
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+          {/* Botones */}
+          <View style={styles.buttonRow}>
             <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
               onPress={onClose}
@@ -100,26 +121,19 @@ const AddParameterModal = ({ visible, onClose, onSave, initialParam }) => {
   );
 };
 
-// ... (Estilos sin cambios)
 const styles = StyleSheet.create({
-  centeredView: {
+  backdrop: {
     flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    padding: 16,
   },
-  modalView: {
-    margin: 20,
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 25,
-    alignItems: "stretch",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    width: "90%",
+  modalContainer: {
+    width: "100%",
+    borderRadius: AppTheme.SIZES.radius * 1.5,
+    backgroundColor: AppTheme.COLORS.white,
+    padding: AppTheme.SIZES.padding,
   },
   modalTitle: {
     ...AppTheme.FONTS.h2,
@@ -130,36 +144,58 @@ const styles = StyleSheet.create({
     ...AppTheme.FONTS.body2,
     marginBottom: 8,
   },
+
+  // --- Picker fix ---
+  pickerOuter: {
+    borderColor: AppTheme.COLORS.lightGray,
+    borderWidth: 1,
+    borderRadius: AppTheme.SIZES.radius,
+    marginBottom: AppTheme.SIZES.margin,
+    backgroundColor: AppTheme.COLORS.white,
+    overflow: "hidden",
+  },
+  // Para Android real: aseguramos zIndex/elevation para que no se esconda
+  pickerOuterAndroid: {
+    zIndex: 10,
+    elevation: 10,
+  },
+  // Altura fija y centrado vertical
   pickerContainer: {
-    borderColor: AppTheme.COLORS.lightGray,
-    borderWidth: 1,
-    borderRadius: AppTheme.SIZES.radius,
-    marginBottom: AppTheme.SIZES.margin,
-    backgroundColor: AppTheme.COLORS.white,
+    height: 52,
+    justifyContent: "center",
   },
+  picker: {
+    height: 52,
+    width: "100%",
+  },
+
   input: {
-    ...AppTheme.FONTS.body2,
-    height: 50,
     borderColor: AppTheme.COLORS.lightGray,
     borderWidth: 1,
     borderRadius: AppTheme.SIZES.radius,
-    paddingHorizontal: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     marginBottom: AppTheme.SIZES.margin,
-    backgroundColor: AppTheme.COLORS.white,
+    ...AppTheme.FONTS.body2,
   },
-  buttonContainer: {
+  errorText: {
+    ...AppTheme.FONTS.caption,
+    color: "red",
+    marginBottom: AppTheme.SIZES.margin,
+  },
+  buttonRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 10,
+    marginTop: AppTheme.SIZES.base,
   },
   button: {
-    backgroundColor: AppTheme.COLORS.primary,
-    borderRadius: AppTheme.SIZES.radius,
-    padding: 15,
-    elevation: 2,
     flex: 1,
-    marginHorizontal: 5,
+    paddingVertical: 12,
+    borderRadius: AppTheme.SIZES.radius,
+    backgroundColor: AppTheme.COLORS.primary,
+    justifyContent: "center",
     alignItems: "center",
+    marginHorizontal: 5,
   },
   cancelButton: {
     backgroundColor: AppTheme.COLORS.darkGray,

@@ -4,6 +4,7 @@ import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   onSnapshot,
   orderBy,
@@ -35,18 +36,20 @@ import AddParameterModal, {
 import { AppTheme } from "../../constants/theme";
 import { auth, db, storage } from "../../firebaseConfig";
 
-// Interfaces
+// ---------- Tipos ----------
 interface Aquarium {
   id: string;
   name: string;
   imageUrl?: string;
   volume?: number;
 }
+
 interface ParameterReading {
   id: string;
   timestamp: any;
   value: number;
 }
+
 interface MaintenanceLog {
   id: string;
   timestamp: any;
@@ -56,10 +59,13 @@ interface MaintenanceLog {
   units?: "liters" | "gallons";
   smartNote?: string;
 }
+
 type ParameterKey = keyof typeof PARAMETERS;
+
 interface ParameterData {
   [key: string]: ParameterReading[];
 }
+
 interface ChartPoint {
   value: number;
   label?: string;
@@ -67,33 +73,51 @@ interface ChartPoint {
   hideDataPoint?: boolean;
 }
 
-// Componente de Gráfica (sin cambios)
+type TimeRange = "week" | "month" | "4m" | "6m" | "year" | "all";
+
+// ---------- Helpers ----------
+const getDateFromTimestamp = (ts: any): Date => {
+  if (!ts || !ts.seconds) return new Date();
+  return new Date(ts.seconds * 1000);
+};
+
+const formatShortDate = (date: Date) =>
+  date.toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+
+const formatLongDateTime = (date: Date) =>
+  date.toLocaleString("es-ES", {
+    dateStyle: "long",
+    timeStyle: "short",
+  });
+
+// ---------- Componente de gráfica ----------
 const ParameterChart = ({
   name,
   data,
+  readings,
   onAdd,
+  onDelete,
 }: {
   name: string;
   data: ChartPoint[];
+  readings: ParameterReading[];
   onAdd: () => void;
+  onDelete: (readingId: string) => void;
 }) => {
   const showChart = data.length > 0;
 
-  // 1. Maneja el caso de 1 solo punto (como ya tenías)
-  let processedData =
-    data.length === 1 ? [data[0], { ...data[0], label: undefined }] : [...data];
+  // 👇 AHORA: NADA de duplicar puntos ni punto fantasma
+  const chartData: ChartPoint[] = [...data];
 
-  // 2. Si hay datos, añadimos un punto fantasma al final
-  if (data.length > 0) {
-    // Obtenemos el último valor real para que la línea no "salte"
-    const lastValue = data[data.length - 1].value;
-
-    processedData.push({
-      value: lastValue, // Usa el último valor
-      label: " ", // Una etiqueta con espacio para que ocupe lugar
-      hideDataPoint: true, // ¡Esta es la clave! Oculta el punto
-    });
-  }
+  // Mostramos todas las lecturas del rango, de más reciente a más antigua
+  const recentReadings = [...readings].sort(
+    (a, b) =>
+      getDateFromTimestamp(b.timestamp).getTime() -
+      getDateFromTimestamp(a.timestamp).getTime()
+  );
 
   return (
     <View style={styles.chartContainer}>
@@ -107,9 +131,10 @@ const ParameterChart = ({
           />
         </TouchableOpacity>
       </View>
+
       {showChart ? (
         <LineChart
-          data={processedData} // <-- 3. Usa el array procesado
+          data={chartData}
           color={AppTheme.COLORS.secondary}
           thickness={3}
           yAxisTextStyle={{ color: AppTheme.COLORS.darkGray }}
@@ -123,7 +148,10 @@ const ParameterChart = ({
           dataPointsColor={AppTheme.COLORS.primary}
           dataPointsRadius={4}
           isAnimated
-          // (Asegúrate de quitar 'spacingEnd' o 'paddingRight' de aquí)
+          // separa el primer punto del eje Y
+          initialSpacing={40}
+          // margen a la derecha para que el último punto no se pegue al borde
+          endSpacing={60}
         />
       ) : (
         <View style={styles.noDataContainer}>
@@ -132,13 +160,54 @@ const ParameterChart = ({
           </Text>
         </View>
       )}
+
+      {recentReadings.length > 0 && (
+        <View style={styles.readingsList}>
+          <Text style={styles.readingsTitle}>Lecturas recientes</Text>
+          {recentReadings.map((r) => {
+            const date = getDateFromTimestamp(r.timestamp);
+            return (
+              <View key={r.id} style={styles.readingRow}>
+                <View>
+                  <Text style={styles.readingValue}>{r.value}</Text>
+                  <Text style={styles.readingDate}>
+                    {formatLongDateTime(date)}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() =>
+                    Alert.alert(
+                      "Eliminar lectura",
+                      `¿Deseas eliminar la lectura de ${formatLongDateTime(
+                        date
+                      )}?`,
+                      [
+                        { text: "Cancelar", style: "cancel" },
+                        {
+                          text: "Eliminar",
+                          style: "destructive",
+                          onPress: () => onDelete(r.id),
+                        },
+                      ]
+                    )
+                  }
+                >
+                  <FontAwesome name="trash-o" size={20} color="#e74c3c" />
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 };
 
+// ---------- Pantalla principal ----------
 const AquariumDetailScreen = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+
   const [aquarium, setAquarium] = useState<Aquarium | null>(null);
   const [parameters, setParameters] = useState<ParameterData>({});
   const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceLog[]>([]);
@@ -146,18 +215,21 @@ const AquariumDetailScreen = () => {
   const [maintenanceModalVisible, setMaintenanceModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [timeRange, setTimeRange] = useState<TimeRange>("month");
 
   useEffect(() => {
     if (!id) {
       router.back();
       return;
     }
+
     const currentUser = auth.currentUser;
     if (!currentUser) {
       setIsLoading(false);
       return;
     }
 
+    // --- Documento del acuario ---
     const aquariumDocRef = doc(db, "aquariums", id);
     const unsubscribeAquarium = onSnapshot(aquariumDocRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -168,37 +240,48 @@ const AquariumDetailScreen = () => {
       setIsLoading(false);
     });
 
+    // --- Parámetros ---
     const paramsCollectionRef = collection(db, "aquariums", id, "parameters");
     const paramsQuery = query(
       paramsCollectionRef,
       where("userId", "==", currentUser.uid)
     );
+
     const unsubscribeParams = onSnapshot(
       paramsQuery,
       (snapshot) => {
         const allParams: ParameterData = {};
-        snapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          const paramType = data.type;
+
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data();
+          const paramType = data.type as string;
+
           if (!allParams[paramType]) allParams[paramType] = [];
+
           allParams[paramType].push({
-            id: doc.id,
+            id: docSnap.id,
             value: data.value,
             timestamp: data.timestamp,
           });
         });
+
+        // Ordenar por fecha ascendente
         for (const paramType in allParams) {
           if (allParams[paramType] && allParams[paramType].length > 0) {
             allParams[paramType].sort(
-              (a, b) => a.timestamp?.seconds - b.timestamp?.seconds
+              (a, b) =>
+                getDateFromTimestamp(a.timestamp).getTime() -
+                getDateFromTimestamp(b.timestamp).getTime()
             );
           }
         }
+
         setParameters(allParams);
       },
       (error) => console.error("Error al escuchar los parámetros:", error)
     );
 
+    // --- Bitácora de mantenimiento ---
     const logsCollectionRef = collection(
       db,
       "aquariums",
@@ -213,9 +296,9 @@ const AquariumDetailScreen = () => {
     const unsubscribeLogs = onSnapshot(
       logsQuery,
       (snapshot) => {
-        const logsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+        const logsData = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
         })) as MaintenanceLog[];
         setMaintenanceLogs(logsData);
       },
@@ -227,8 +310,9 @@ const AquariumDetailScreen = () => {
       unsubscribeParams();
       unsubscribeLogs();
     };
-  }, [id]);
+  }, [id, router]);
 
+  // ---------- Lógica de parámetros ----------
   const handleSaveParameter = async (paramType: string, value: number) => {
     const currentUser = auth.currentUser;
     if (!id || !currentUser) {
@@ -239,14 +323,16 @@ const AquariumDetailScreen = () => {
       );
       return;
     }
+
     try {
       const paramsRef = collection(db, "aquariums", id, "parameters");
       await addDoc(paramsRef, {
         type: paramType,
-        value: value,
+        value,
         timestamp: serverTimestamp(),
         userId: currentUser.uid,
       });
+
       const key = paramType as ParameterKey;
       Alert.alert(
         "¡Éxito!",
@@ -261,6 +347,29 @@ const AquariumDetailScreen = () => {
     }
   };
 
+  const handleDeleteParameterReading = async (
+    paramType: ParameterKey,
+    readingId: string
+  ) => {
+    const currentUser = auth.currentUser;
+    if (!id || !currentUser) {
+      Alert.alert(
+        "Error",
+        "Sesión no válida. Intenta iniciar sesión de nuevo."
+      );
+      return;
+    }
+
+    try {
+      const readingRef = doc(db, "aquariums", id, "parameters", readingId);
+      await deleteDoc(readingRef);
+    } catch (error) {
+      console.error("Error al eliminar la lectura:", error);
+      Alert.alert("Error", "No se pudo eliminar la lectura.");
+    }
+  };
+
+  // ---------- Mantenimiento ----------
   const handleSaveMaintenance = async (type: string, data: any) => {
     const currentUser = auth.currentUser;
     if (!id || !currentUser) {
@@ -271,28 +380,35 @@ const AquariumDetailScreen = () => {
       );
       return;
     }
+
     let logData: any = {
       type,
       notes: data.notes,
       timestamp: serverTimestamp(),
       userId: currentUser.uid,
     };
+
     if (type === "water_change" && aquarium?.volume) {
       logData.volume = data.volume;
       logData.units = data.units;
+
       const lastNitrate = parameters.no3?.[parameters.no3.length - 1]?.value;
       const lastPhosphate = parameters.po4?.[parameters.po4.length - 1]?.value;
       const totalVolume = aquarium.volume;
       let changeVolume = data.volume;
+
       if (data.units === "gallons") {
         changeVolume = data.volume * 3.78541;
       }
+
       const reductionPercentage = changeVolume / totalVolume;
-      let smartNotesArray = [];
+      const smartNotesArray: string[] = [];
+
       if (lastNitrate !== undefined) {
         const nitrateReduction = (reductionPercentage * lastNitrate).toFixed(2);
         smartNotesArray.push(`Puede reducir NO₃ en ~${nitrateReduction} ppm.`);
       }
+
       if (lastPhosphate !== undefined) {
         const phosphateReduction = (
           reductionPercentage * lastPhosphate
@@ -301,10 +417,12 @@ const AquariumDetailScreen = () => {
           `Puede reducir PO₄ en ~${phosphateReduction} ppm.`
         );
       }
+
       if (smartNotesArray.length > 0) {
         logData.smartNote = smartNotesArray.join(" ");
       }
     }
+
     try {
       const logsRef = collection(db, "aquariums", id, "maintenance_logs");
       await addDoc(logsRef, logData);
@@ -318,6 +436,39 @@ const AquariumDetailScreen = () => {
     }
   };
 
+  // ---------- Filtro de rango de tiempo ----------
+  const filterByRange = (list: ParameterReading[]): ParameterReading[] => {
+    if (timeRange === "all") return list;
+
+    const now = new Date();
+    const msPerDay = 24 * 60 * 60 * 1000;
+    let fromDate = new Date(now);
+
+    switch (timeRange) {
+      case "week":
+        fromDate = new Date(now.getTime() - 7 * msPerDay);
+        break;
+      case "month":
+        fromDate = new Date(now.getTime() - 30 * msPerDay);
+        break;
+      case "4m":
+        fromDate = new Date(now.getTime() - 120 * msPerDay);
+        break;
+      case "6m":
+        fromDate = new Date(now.getTime() - 180 * msPerDay);
+        break;
+      case "year":
+        fromDate = new Date(now.getTime() - 365 * msPerDay);
+        break;
+    }
+
+    return list.filter((p) => {
+      const date = getDateFromTimestamp(p.timestamp);
+      return date >= fromDate;
+    });
+  };
+
+  // ---------- Imagen ----------
   const pickImage = async () => {
     const permissionResult =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -328,13 +479,16 @@ const AquariumDetailScreen = () => {
       );
       return;
     }
+
     const pickerResult = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.5,
     });
+
     if (pickerResult.canceled) return;
+
     if (pickerResult.assets && pickerResult.assets.length > 0) {
       uploadImage(pickerResult.assets[0].uri);
     }
@@ -347,12 +501,14 @@ const AquariumDetailScreen = () => {
       setIsUploading(false);
       return;
     }
+
     const response = await fetch(uri);
     const blob = await response.blob();
     const storageRef = ref(
       storage,
       `aquarium_images/${currentUser.uid}/${id}_${new Date().getTime()}`
     );
+
     try {
       await uploadBytes(storageRef, blob);
       const downloadURL = await getDownloadURL(storageRef);
@@ -367,6 +523,7 @@ const AquariumDetailScreen = () => {
     }
   };
 
+  // ---------- Render ----------
   if (isLoading) {
     return (
       <View style={styles.centerContent}>
@@ -383,12 +540,14 @@ const AquariumDetailScreen = () => {
           headerBackTitle: "Mis Acuarios",
         }}
       />
+
       <AddParameterModal
-        visible={paramToEdit !== null} // Se muestra si paramToEdit NO es nulo
-        initialParam={paramToEdit} // Pasamos el parámetro seleccionado
-        onClose={() => setParamToEdit(null)} // Al cerrar, lo volvemos nulo
+        visible={paramToEdit !== null}
+        initialParam={paramToEdit}
+        onClose={() => setParamToEdit(null)}
         onSave={handleSaveParameter}
       />
+
       <AddMaintenanceModal
         visible={maintenanceModalVisible}
         onClose={() => setMaintenanceModalVisible(false)}
@@ -396,6 +555,7 @@ const AquariumDetailScreen = () => {
       />
 
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Foto */}
         <TouchableOpacity onPress={pickImage} disabled={isUploading}>
           <View style={styles.photoContainer}>
             {aquarium?.imageUrl ? (
@@ -420,32 +580,68 @@ const AquariumDetailScreen = () => {
           </View>
         </TouchableOpacity>
 
+        {/* Parámetros */}
         <Text style={styles.sectionTitle}>Parámetros</Text>
+
+        {/* Selector global de rango de tiempo */}
+        <View style={styles.rangeSelector}>
+          {[
+            { label: "7d", value: "week" },
+            { label: "1m", value: "month" },
+            { label: "4m", value: "4m" },
+            { label: "6m", value: "6m" },
+            { label: "1a", value: "year" },
+            { label: "Todo", value: "all" },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[
+                styles.rangeButton,
+                timeRange === opt.value && styles.rangeButtonActive,
+              ]}
+              onPress={() => setTimeRange(opt.value as TimeRange)}
+            >
+              <Text
+                style={[
+                  styles.rangeButtonText,
+                  timeRange === opt.value && styles.rangeButtonTextActive,
+                ]}
+              >
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {Object.keys(PARAMETERS).map((key) => {
           const paramKey = key as ParameterKey;
           const paramData = parameters[paramKey] || [];
-          const dataForChart: ChartPoint[] = paramData.map((p) => {
-            const date = p.timestamp
-              ? new Date(p.timestamp.seconds * 1000)
-              : new Date();
+
+          const filteredReadings = filterByRange(paramData);
+
+          const dataForChart: ChartPoint[] = filteredReadings.map((p) => {
+            const date = getDateFromTimestamp(p.timestamp);
             return {
               value: p.value,
-              label: date.toLocaleDateString("es-ES", {
-                day: "2-digit",
-                month: "2-digit",
-              }),
+              label: formatShortDate(date),
             };
           });
+
           return (
             <ParameterChart
               key={paramKey}
               name={PARAMETERS[paramKey].name}
               data={dataForChart}
+              readings={filteredReadings}
               onAdd={() => setParamToEdit(paramKey)}
+              onDelete={(readingId) =>
+                handleDeleteParameterReading(paramKey, readingId)
+              }
             />
           );
         })}
 
+        {/* Bitácora de mantenimiento */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Bitácora de Mantenimiento</Text>
           <TouchableOpacity onPress={() => setMaintenanceModalVisible(true)}>
@@ -461,10 +657,7 @@ const AquariumDetailScreen = () => {
           maintenanceLogs.map((log) => (
             <View key={log.id} style={styles.logItem}>
               <Text style={styles.logDate}>
-                {new Date(log.timestamp?.seconds * 1000).toLocaleString(
-                  "es-ES",
-                  { dateStyle: "long", timeStyle: "short" }
-                )}
+                {formatLongDateTime(getDateFromTimestamp(log.timestamp))}
               </Text>
               {log.type === "water_change" ? (
                 <>
@@ -496,6 +689,8 @@ const AquariumDetailScreen = () => {
             No hay registros de mantenimiento.
           </Text>
         )}
+
+        {/* Recordatorios */}
         <Link
           href={{
             pathname: "/reminders",
@@ -519,6 +714,7 @@ const AquariumDetailScreen = () => {
   );
 };
 
+// ---------- Estilos ----------
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: AppTheme.COLORS.background },
   centerContent: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -555,6 +751,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    overflow: "hidden",
   },
   chartHeader: {
     flexDirection: "row",
@@ -574,7 +771,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 10,
   },
-  // --- 👇 NUEVOS ESTILOS ---
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -608,8 +804,8 @@ const styles = StyleSheet.create({
   },
   smartNote: {
     ...AppTheme.FONTS.body2,
-    backgroundColor: "#E6F4FF", // Un azul claro
-    color: "#00529B", // Un azul oscuro
+    backgroundColor: "#E6F4FF",
+    color: "#00529B",
     padding: 10,
     borderRadius: AppTheme.SIZES.radius,
     marginVertical: 8,
@@ -636,6 +832,57 @@ const styles = StyleSheet.create({
     color: AppTheme.COLORS.white,
     fontSize: 16,
     marginLeft: 10,
+  },
+  // Rango de tiempo
+  rangeSelector: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: AppTheme.SIZES.margin,
+  },
+  rangeButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: AppTheme.COLORS.lightGray,
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  rangeButtonActive: {
+    backgroundColor: AppTheme.COLORS.primary,
+    borderColor: AppTheme.COLORS.primary,
+  },
+  rangeButtonText: {
+    ...AppTheme.FONTS.caption,
+    color: AppTheme.COLORS.darkGray,
+  },
+  rangeButtonTextActive: {
+    color: "#fff",
+  },
+  // Lista de lecturas
+  readingsList: {
+    marginTop: AppTheme.SIZES.base,
+    borderTopWidth: 1,
+    borderTopColor: AppTheme.COLORS.lightGray,
+    paddingTop: AppTheme.SIZES.base,
+  },
+  readingsTitle: {
+    ...AppTheme.FONTS.caption,
+    color: AppTheme.COLORS.darkGray,
+    marginBottom: 4,
+  },
+  readingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  readingValue: {
+    ...AppTheme.FONTS.body2,
+  },
+  readingDate: {
+    ...AppTheme.FONTS.caption,
+    color: AppTheme.COLORS.darkGray,
   },
 });
 
