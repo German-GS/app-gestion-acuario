@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "91058824770",
+    "project_id": "aquamind-c43cb",
+    "storage_bucket": "aquamind-c43cb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:91058824770:android:6cdd1370a749f7d0d82fdb",
+        "android_client_info": {
+          "package_name": "com.aquamind.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "91058824770-ji7514ti365ilg1svgqaumcbg5oumjl7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aquamind.app",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "91058824770-p93jsqs7fihgvfgivjjqvprbd72nnpfc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCfZv0_ijgC1bdBBvm61Ol5qt61KulJtcw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "91058824770-aigfc59143jmeqfdi0rfus5kqngeqq18.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "91058824770-piv7dgiijuvckiq1e53n9geoasj38b2a.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.aquamind.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

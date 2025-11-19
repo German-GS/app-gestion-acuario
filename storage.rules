@@ -1,0 +1,12 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Permite que los usuarios autenticados puedan escribir en una carpeta con su ID
+    // Ejemplo: /aquarium_images/UID_DEL_USUARIO/nombre_del_archivo.jpg
+    match /aquarium_images/{userId}/{allPaths=**} {
+      allow read;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

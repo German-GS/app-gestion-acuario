@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /aquariums/{aquariumId} {
+  allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+  allow list: if request.auth != null;
+  allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+
+  // Parámetros del acuario
+  match /parameters/{parameterId} {
+    // leer (get + list) solo si el userId del doc es el usuario logueado
+    allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+    
+    // crear parámetro
+    allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    
+    // borrar (y opcionalmente actualizar) parámetro
+    allow delete, update: if request.auth != null && resource.data.userId == request.auth.uid;
+  }
+  
+  // Bitácora de mantenimiento (la dejas igual)
+  match /maintenance_logs/{logId} {
+    allow read, list: if request.auth != null && get(/databases/$(database)/documents/aquariums/$(aquariumId)).data.userId == request.auth.uid;
+    allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+  }
+}
+
+    match /articles/{articleId} {
+      allow read: if request.auth != null;
+    }
+
+    // --- 👇 AÑADE ESTA NUEVA REGLA AQUÍ 👇 ---
+    // Permite al usuario leer, crear y borrar sus propios recordatorios.
+    match /reminders/{reminderId} {
+      allow read, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+  }
+}
