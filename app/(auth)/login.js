@@ -38,7 +38,7 @@ const LoginScreen = () => {
     // El webClientId se usa para obtener el idToken y es indispensable.
     GoogleSignin.configure({
       webClientId:
-        "91058824770-ji7514ti365ilg1svgqaumcbg5oumjl7.apps.googleusercontent.com",
+        "91058824770-p93jsqs7fihgvfgivjjqvprbd72nnpfc.apps.googleusercontent.com",
       offlineAccess: true,
     });
   }, []);
