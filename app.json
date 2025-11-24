@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icono.png",
     "scheme": "aquamind",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
@@ -15,15 +15,15 @@
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
-  "package": "com.aquamind.app",
-  "jsEngine": "hermes",
-  "googleServicesFile": "./google-services.json",
-  "adaptiveIcon": {
-    "foregroundImage": "./assets/icono.png",
-    "backgroundColor": "#FFFFFF"
-  },
-  "versionCode": 2
-},
+      "package": "com.aquamind.app",
+      "jsEngine": "hermes",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icono.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "versionCode": 2
+    },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"

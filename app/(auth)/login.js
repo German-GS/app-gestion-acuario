@@ -36,11 +36,10 @@ const LoginScreen = () => {
   useEffect(() => {
     // Configura Google Sign-In una sola vez.
     // El webClientId se usa para obtener el idToken y es indispensable.
-    GoogleSignin.configure({
-      webClientId:
-        "91058824770-p93jsqs7fihgvfgivjjqvprbd72nnpfc.apps.googleusercontent.com",
-      offlineAccess: true,
-    });
+   GoogleSignin.configure({
+  webClientId: "91058824770-p93jsqs7fihgvfgivjjqvprbd72nnpfc.apps.googleusercontent.com", // ¿Es este correcto?
+  offlineAccess: true,
+});
   }, []);
 
   const handleGoogleLogin = async () => {
