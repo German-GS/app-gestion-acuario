@@ -1,15 +1,16 @@
 // app/(auth)/login.js
-import {
+/* import {
   GoogleSignin,
   statusCodes,
-} from "@react-native-google-signin/google-signin";
+} from "@react-native-google-signin/google-signin"; 
+*/
 import { useRouter } from "expo-router";
 import {
-  GoogleAuthProvider,
-  signInWithCredential,
+  // GoogleAuthProvider, // Comentado para futuro uso
+  // signInWithCredential, // Comentado para futuro uso
   signInWithEmailAndPassword,
 } from "firebase/auth";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -33,28 +34,27 @@ const LoginScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
+  /* --- 1. CONFIGURACIÓN GOOGLE (COMENTADA) ---
   useEffect(() => {
     // Configura Google Sign-In una sola vez.
-    // El webClientId se usa para obtener el idToken y es indispensable.
-   GoogleSignin.configure({
-  webClientId: "91058824770-p93jsqs7fihgvfgivjjqvprbd72nnpfc.apps.googleusercontent.com", // ¿Es este correcto?
-  offlineAccess: true,
-});
+    GoogleSignin.configure({
+      webClientId: "TU_WEB_CLIENT_ID", // Recuerda verificar esto en Firebase Console
+      offlineAccess: true,
+    });
   }, []);
+  */
 
+  /* --- 2. LÓGICA GOOGLE (COMENTADA) ---
   const handleGoogleLogin = async () => {
     try {
       await GoogleSignin.hasPlayServices();
       const userInfo = await GoogleSignin.signIn();
 
-      // --- 👇 LA CORRECCIÓN ESTÁ AQUÍ 👇 ---
-      // Obtenemos el idToken desde userInfo.data en lugar de userInfo
+      // Obtenemos el idToken desde userInfo.data
       const idToken = userInfo.data?.idToken;
 
       if (!idToken) {
-        throw new Error(
-          "No se pudo obtener el idToken de la respuesta de Google."
-        );
+        throw new Error("No se pudo obtener el idToken de la respuesta de Google.");
       }
 
       const googleCredential = GoogleAuthProvider.credential(idToken);
@@ -73,6 +73,7 @@ const LoginScreen = () => {
       }
     }
   };
+  */
 
   const handleEmailLogin = () => {
     if (!email || !password) {
@@ -135,12 +136,14 @@ const LoginScreen = () => {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
+          {/* --- 3. BOTÓN GOOGLE (COMENTADO) --- */}
+          {/* <TouchableOpacity
             style={[styles.button, styles.googleButton]}
             onPress={handleGoogleLogin}
           >
             <Text style={styles.buttonText}>🚀 Iniciar con Google</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> 
+          */}
 
           <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
             <Text style={styles.linkText}>

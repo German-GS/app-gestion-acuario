@@ -96,6 +96,7 @@ const CreateAquariumScreen = () => {
           placeholder="Ej: Mi primer plantado"
           value={formData.name}
           onChangeText={(value) => handleInputChange('name', value)}
+          placeholderTextColor={AppTheme.COLORS.darkGray}
         />
         <Text style={styles.label}>Volumen (en litros)</Text>
         <TextInput
@@ -104,6 +105,7 @@ const CreateAquariumScreen = () => {
           keyboardType="numeric"
           value={formData.volume}
           onChangeText={(value) => handleInputChange('volume', value)}
+          placeholderTextColor={AppTheme.COLORS.darkGray}
         />
         
         {/* Pickers */}

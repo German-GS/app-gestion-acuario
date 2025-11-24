@@ -170,6 +170,7 @@ const AddParameterModal = ({
             keyboardType="numeric"
             value={value}
             onChangeText={setValue}
+            placeholderTextColor={AppTheme.COLORS.darkGray}
           />
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
